@@ -97,3 +97,12 @@ The promoted artifact is
 This is the first chat-v2 configuration to pass the latent ablation gate and
 the 70% exact-record benchmark target. Results remain exploratory and
 synthetic-only per the limitations above.
+
+## Informal `อ.เมือง` abbreviation
+
+The parser now recognizes `อ.เมือง` as a district shorthand when a province
+appears later in the same message. It resolves the shorthand against the
+province-constrained gazetteer tuple, so `อ.เมือง ... จ สกลนคร` yields the
+canonical district `เมืองสกลนคร` while preserving the complete preceding
+address detail, including `หมู่`, `ซอย`, and road text. Bare `เมือง` is not
+treated as an administrative district candidate without the `อ.` context.

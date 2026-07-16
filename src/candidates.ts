@@ -89,6 +89,14 @@ export function generateCandidates(
 ): readonly Candidate[] {
 	const seeds = new Map<string, CandidateSeed>();
 	const locationIdsBySeed = new Map<string, Set<number>>();
+	const locationTerms = buildLocationTerms(resources.locations);
+	const provinceHint = [...new Set(
+		locationTerms
+			.filter((term) => term.label === "PROVINCE")
+			.map((term) => term.surface),
+	)]
+		.filter((province) => raw.includes(province))
+		.sort((left, right) => right.length - left.length)[0];
 
 	const phoneRanges = matches(PHONE_PATTERN, raw);
 	const administrativeRanges = matches(ADMIN_HINT, raw);
@@ -111,12 +119,22 @@ export function generateCandidates(
 		});
 	}
 
-	for (const term of buildLocationTerms(resources.locations)) {
+	for (const term of locationTerms) {
 		let from = 0;
 		while (from <= raw.length - term.surface.length) {
 			const start = raw.indexOf(term.surface, from);
 			if (start < 0) break;
 			const end = start + term.surface.length;
+			if (
+				term.label === "DISTRICT" &&
+				term.surface === "เมือง" &&
+				(!/อ\.\s*$/u.test(raw.slice(0, start)) ||
+					provinceHint === undefined ||
+					resources.locations[term.locationId]?.province !== provinceHint)
+			) {
+				from = start + Math.max(1, term.surface.length);
+				continue;
+			}
 			if (
 				["SUBDISTRICT", "DISTRICT", "PROVINCE", "POSTCODE"].includes(term.label) &&
 				(phoneRanges.some((phone) => start < phone.start) ||

@@ -16,6 +16,14 @@ export function buildLocationTerms(locations: readonly LocationTuple[]): readonl
       { label: "PROVINCE", surface: location.province, canonical: location.province, locationId },
       { label: "POSTCODE", surface: location.zipcode, canonical: location.zipcode, locationId },
     );
+    if (location.district.startsWith("เมือง") && location.district !== "เมือง") {
+      terms.push({
+        label: "DISTRICT",
+        surface: "เมือง",
+        canonical: location.district,
+        locationId,
+      });
+    }
     if (location.province === "กรุงเทพมหานคร") {
       terms.push(
         { label: "PROVINCE", surface: "กรุงเทพ", canonical: location.province, locationId },

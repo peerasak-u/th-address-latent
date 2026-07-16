@@ -82,6 +82,32 @@ describe("createAddressParser", () => {
 		});
 	});
 
+	test("expands the informal อ.เมือง abbreviation using the province tuple", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "งิ้วด่อน",
+					district: "เมืองสกลนคร",
+					province: "สกลนคร",
+					zipcode: "47000",
+				},
+			],
+		});
+		const raw =
+			"คุณปิยะดา แสงคำ\n089-123-4567\nบ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก ต.งิ้วด่อน อ.เมือง จ สกลนคร 47000";
+
+		expect(parser.parse(raw).fields).toEqual({
+			name: "คุณปิยะดา แสงคำ",
+			phone: "0891234567",
+			address: "บ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก",
+			subdistrict: "งิ้วด่อน",
+			district: "เมืองสกลนคร",
+			province: "สกลนคร",
+			zipcode: "47000",
+		});
+	});
+
 	test("abstains from an invalid postcode instead of inventing one", () => {
 		const parser = createAddressParser(resources);
 		const result = parser.parse("บ้านเลขที่ 1 ปทุมวัน ปทุมวัน กรุงเทพมหานคร 1033");
