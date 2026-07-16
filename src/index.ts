@@ -3,10 +3,14 @@ export { LABELS } from "./types";
 export type {
   Abstention,
   AddressParser,
+	CandidateTrace,
+	CandidateRejection,
+	EvidenceContribution,
   FieldName,
   Label,
   LabelDirection,
   LatentScoringConfig,
+  LegacyLatentScoringConfig,
   LocationTuple,
   OutputLabel,
   ParseDiagnostics,
@@ -15,4 +19,6 @@ export type {
   ParsedSpan,
   ParserOptions,
   ParserResources,
+  ResidualLatentScoringConfig,
+  CandidateSource,
 } from "./types";

@@ -17,6 +17,33 @@ export interface MetricAccumulator {
   fields: Record<keyof ExpectedAddress, { correct: number; total: number }>;
 }
 
+export interface ExactAcceptance {
+	readonly minimumAccuracy: number;
+	readonly requiredExactRecords: number;
+	readonly actualExactRecords: number;
+	readonly passed: boolean;
+}
+
+export function exactAcceptance(
+	metrics: Pick<MetricAccumulator, "records" | "exactRecords">,
+	minimumAccuracy: number,
+): ExactAcceptance {
+	if (
+		!Number.isFinite(minimumAccuracy) ||
+		minimumAccuracy < 0 ||
+		minimumAccuracy > 1
+	) {
+		throw new Error("minimum exact-record accuracy must be between zero and one");
+	}
+	const requiredExactRecords = Math.ceil(metrics.records * minimumAccuracy);
+	return {
+		minimumAccuracy,
+		requiredExactRecords,
+		actualExactRecords: metrics.exactRecords,
+		passed: metrics.exactRecords >= requiredExactRecords,
+	};
+}
+
 export function createMetrics(): MetricAccumulator {
   return {
     records: 0,

@@ -1,0 +1,100 @@
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+
+interface PromotionGate {
+	readonly enforced: boolean;
+	readonly passed: boolean;
+	readonly ablationApplicable?: boolean;
+	readonly failures: readonly string[];
+	readonly grandfathered?: boolean;
+}
+
+interface ScoringConfig {
+	readonly version: string;
+	readonly residualScaleByLabel?: Readonly<Record<string, number>>;
+}
+
+interface GeneratedResourceArtifact {
+	readonly promotionGate?: PromotionGate;
+	readonly resources?: {
+		readonly scoringConfig?: ScoringConfig;
+	};
+}
+
+const IMPORT_PATTERN = /resources\/generated\/[\w.-]+\.json/g;
+
+async function findSourceFiles(root: string): Promise<string[]> {
+	const entries = await readdir(root, { withFileTypes: true });
+	const files: string[] = [];
+	for (const entry of entries) {
+		if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+		const path = join(root, entry.name);
+		if (entry.isDirectory()) {
+			files.push(...(await findSourceFiles(path)));
+		} else if (/\.(ts|tsx)$/.test(entry.name)) {
+			files.push(path);
+		}
+	}
+	return files;
+}
+
+async function findShippedResourcePaths(): Promise<Set<string>> {
+	const paths = new Set<string>();
+	for (const root of ["src", "bench"]) {
+		for (const file of await findSourceFiles(root)) {
+			const contents = await readFile(file, "utf8");
+			for (const match of contents.matchAll(IMPORT_PATTERN)) {
+				paths.add(match[0]);
+			}
+		}
+	}
+	return paths;
+}
+
+const shippedResourcePaths = await findShippedResourcePaths();
+if (shippedResourcePaths.size === 0) {
+	throw new Error("no resources/generated/*.json references found in src/ or bench/");
+}
+
+const failures: string[] = [];
+for (const path of shippedResourcePaths) {
+	const raw = await readFile(path, "utf8").catch(() => null);
+	if (raw === null) {
+		failures.push(`${path}: referenced but missing on disk`);
+		continue;
+	}
+	const artifact: GeneratedResourceArtifact = JSON.parse(raw);
+	const gate = artifact.promotionGate;
+	if (!gate) {
+		failures.push(`${path}: no promotionGate field (predates the ADR-0002 gate)`);
+	} else if (gate.grandfathered) {
+		failures.push(`${path}: grandfathered resources cannot be shipped`);
+	} else if (!gate.enforced) {
+		failures.push(`${path}: promotionGate.enforced is false (built with --skip-gate)`);
+	} else if (!gate.passed) {
+		failures.push(`${path}: promotionGate.passed is false (lost to evidence-only)`);
+	} else if (gate.ablationApplicable === false) {
+		console.log(`${path}: fit-mode=none, promotionGate.passed reflects the evidence-only baseline itself (no ablation was run)`);
+	}
+	const residualScaleByLabel = artifact.resources?.scoringConfig?.residualScaleByLabel;
+	if (residualScaleByLabel) {
+		for (const [label, scale] of Object.entries(residualScaleByLabel)) {
+			if (label !== "NAME" && scale !== 0) {
+				failures.push(
+					`${path}: residualScaleByLabel.${label} is ${scale}, only NAME may have a nonzero residual scale (ADR-0003)`,
+				);
+			}
+		}
+	}
+}
+
+if (failures.length > 0) {
+	console.error("Resource promotion gate check failed:");
+	for (const failure of failures) console.error(`  ${failure}`);
+	console.error(
+		"Rebuild the resource with `bun run build:resources` so it passes the evidence-only ablation gate before shipping it.",
+	);
+	process.exit(1);
+}
+
+console.log(`Resource promotion gate check passed for ${shippedResourcePaths.size} resource(s).`);

@@ -1,10 +1,12 @@
 # th-address-latent
 
-Browser-compatible Thai address extraction experiment using frozen character-latent directions, soft candidate pruning, and deterministic validation.
+Browser-compatible Thai address extraction using typed candidate evidence, a
+small sparse latent residual ranker, soft candidate pruning, and deterministic
+validation. Training happens offline; parsing is local and fast.
 
 ## Why Validator and Pruner are separate
 
-- **Scorer** proposes and scores possible spans. Its frozen direction vectors summarize labeled construction examples.
+- **Scorer** ranks proposed spans. Deterministic evidence supplies the base score; a gated sparse vector may apply a bounded residual correction.
 - **Pruner** searches those hypotheses and softly penalizes overlaps, duplicate fields, unusual order, and inconsistent administrative tuples. It may keep an unusual but plausible result.
 - **Validator** checks the completed result: source offsets, phone/postcode formats, administrative consistency, normalization, confidence, and abstention. It does not create missing candidates.
 
@@ -19,17 +21,26 @@ bun run typecheck
 bun run build
 ```
 
-Build a deterministic local resource artifact:
+Build the promoted sparse-residual resource:
 
 ```bash
 bun run build:resources \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/construction-v1.jsonl \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/name-robust-v1-2040-r1.jsonl \
   --gazetteer ~/Workspace/indie/thai-address-synth-dataset/data/subdistricts.json \
-  --output resources/generated/construction-v2-ngram4-d512.json \
+  --output resources/generated/construction-v3-residual-name-d2048.json \
+  --resource-version construction-v3-residual-name-d2048 \
   --seed 20260720 \
-  --dimension 512 \
-  --max-character-ngram 4
+  --dimension 2048 \
+  --max-character-ngram 4 \
+  --context-window 12 \
+  --epochs 4 \
+  --max-negatives 8 \
+  --name-residual-scale 1 \
+  --address-residual-scale 0 \
+  --dataset-balance equal-family \
+  --negative-policy other-spans \
+  --fit-mode pairwise-residual
 ```
 
 Run the exploratory head-to-head benchmark:
@@ -38,10 +49,72 @@ Run the exploratory head-to-head benchmark:
 bun run bench \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/construction-v1.jsonl \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/name-robust-v1-2040-r1.jsonl \
-  --resources resources/generated/construction-v2-ngram4-d512.json \
+  --resources resources/generated/construction-v3-residual-name-d2048.json \
   --legacy ~/Workspace/indie/thai-address-splitter \
   --output .bench-results/construction-v1.json
 ```
+
+Run an aggregate-only benchmark over a structured recipient list. Exact input
+and parsed values are never written to the report; unstructured blocks must
+match the reviewed supplement fixture:
+
+```bash
+bun run bench:list \
+  --input /path/to/private-recipient-list.txt \
+  --resources resources/generated/construction-v3-residual-name-d2048.json \
+  --min-exact-accuracy 0.95 \
+  --output .bench-results/recipient-list.json
+```
+
+The list benchmark defaults to a 95% exact-record acceptance threshold and exits
+non-zero below it. For 58 records this requires at least 56 exact records.
+
+`bench/private/` is gitignored; keep private input lists there.
+
+## Candidate engine
+
+`createAddressParser` compiles resource-derived indexes once. Each parse then
+builds immutable context and runs structured, location, and segment candidate
+sources through a seed store, typed evidence rules, scoring, pruning, and final
+validation. See `CONTEXT.md` and `docs/adr/0001-deep-candidate-engine.md` for the
+domain language and decision.
+
+Pass `{ diagnostics: "full" }` to receive candidate evidence, pruning outcomes,
+pre-candidate rejection rules, and exact validation abstention reasons. Full
+diagnostics may contain input text and should not be logged for private data.
+
+The compatibility fields named `confidence` currently contain an uncalibrated
+selection score. Diagnostics report `scoreSemantics: "uncalibrated-selection-score"`.
+
+## Experimental fitting modes
+
+Resource builds accept:
+
+```text
+--dataset-balance uniform-records|equal-family
+--negative-policy output-only|other-spans
+--fit-mode none|gold-centroid|candidate-contrastive|pairwise-residual
+```
+
+`pairwise-residual` learns from each gold candidate against hard candidates
+produced by the real Candidate Engine. It also learns an explicit `NULL`
+choice for absent fields. The learned score is a bounded correction to the
+evidence logit, so a missing direction or a zero label scale reproduces the
+evidence-only score exactly. `none` writes that evidence-only parser.
+
+`bun run build:resources` exits non-zero if the built resource loses its
+evidence-only ablation. Pass `--skip-gate` to write an unpromoted experiment
+artifact anyway; it still refuses to overwrite the default shipped output path,
+so an unpromoted build must target an explicit `--output`. Check that every
+shipped resource still passes its recorded gate, including that only `NAME`
+may carry a nonzero residual scale, with:
+
+```bash
+bun run check:resource-gate
+```
+
+CI runs this check before building the library and demo, on pushes to `main`
+and on pull requests. See `docs/adr/0002-resource-promotion-gate.md`.
 
 ## Browser API
 
@@ -56,24 +129,51 @@ The browser receives a frozen resource artifact. It does not fit directions, mut
 
 ## Latent feature configuration
 
-Every artifact records its feature schema and character n-gram range. Runtime accepts only the current `char-ngram-v2` schema, so frozen directions cannot be paired accidentally with changed feature semantics. The first controlled v2 experiment uses character 1–4 grams and a 512-dimensional hash vector. Rebuild resources whenever the feature configuration changes.
+Every artifact records its feature schema, hash dimension, character n-gram
+range, and context window. The promoted `candidate-hash-v3` schema hashes span
+text, nearby context, boundaries, shape, candidate source, evidence-rule IDs,
+and distances to useful markers into a sparse 2,048-dimensional vector. Runtime
+validates the schema before using a frozen resource. Rebuild resources whenever
+feature semantics change.
 
-## Current exploratory verdict
+## Current benchmark verdict
 
-Snapshot `construction-v1-1b063cf770f2` contained 473 records: 394 for direction construction and 79 location-grouped evaluation records.
+The shipped resource activates a sparse residual only for `NAME`. Enabling the
+same ranker for `ADDRESS_DETAIL` improved synthetic scores but regressed the
+private acceptance list, so address selection remains evidence-only.
 
-| Parser | Exact-record accuracy |
-|---|---:|
-| Full hybrid with frozen directions | 10.1% |
-| Same hybrid without directions | 12.7% |
-| Legacy regex parser | 1.3% |
+| Leakage-safe partition | Sparse residual | Evidence-only | Gain |
+|---|---:|---:|---:|
+| Development (401) | 80.3% | 72.6% | +7.7 pp |
+| Evaluation (259) | 64.5% | 62.2% | +2.3 pp |
 
-The hybrid pipeline currently handles the synthetic no-space format much better than the legacy parser, but the first character-centroid latent directions **hurt** exact-record accuracy. The latent mechanism has therefore not passed its ablation gate. Name/address boundary scoring is the main bottleneck; the next readout must beat `noDirections` before it becomes the default.
+The aggregate-only 58-record private acceptance benchmark remains 56/58 exact
+(96.6%), with a 10.19 ms p95 on the measured run. The synthetic evaluation p95
+is 6.18 ms, only 0.40 ms above evidence-only. These are regression and
+promotion gates, not claims of 95% production accuracy.
 
 ## Evaluation policy
 
-The construction JSONL is used to build and debug the parser. Frozen direction fitting and evaluation are separated by complete authoritative location tuple. Both parsers receive only `raw` during evaluation. Both also have access to the full external gazetteer, so this split measures direction-fitting leakage rather than performance without location knowledge.
+The loader preserves generator-declared train/evaluation provenance and template
+family. Records are partitioned into train, development, evaluation, and
+excluded sets. A complete authoritative location tuple never crosses partitions;
+generator-evaluation template families are admitted only to evaluation, and
+generator-train families only to train/development. Incompatible cross-products
+are excluded. The current combined split is 1,512 train, 401 development, 259
+evaluation, and 669 excluded.
 
-The benchmark reports a `noDirections` ablation using the same retrieval, pruning, and validation with frozen latent directions removed. The latent component has demonstrated gain only when it beats that ablation, not merely when the complete hybrid beats the legacy regex parser.
+Selection gold for `NAME` and `ADDRESS_DETAIL` comes from the annotated source
+span after surface normalization. Dataset expectations that expand abbreviations,
+correct typos, or rewrite spacing are normalization tasks and no longer count as
+candidate-selection failures.
 
-Synthetic results remain exploratory. A superiority claim requires a separately seeded, manually reviewed 300–500-record gold set plus anonymized real-world examples where legally available. Gazetteer provenance and redistribution rights must be resolved before publishing generated browser resources.
+The benchmark reports an evidence-only ablation (the `noDirections` report key)
+using the same retrieval, pruning, and validation with frozen latent directions
+removed. The latent component has demonstrated gain only when it beats that
+ablation, not merely when the complete hybrid beats the legacy regex parser.
+
+Synthetic results remain exploratory. Further address-ranker work needs a
+separately seeded, manually reviewed real-world gold set, especially ambiguous
+recipient/address boundaries and missing fields. Gazetteer provenance and
+redistribution rights must be resolved before publishing generated browser
+resources.

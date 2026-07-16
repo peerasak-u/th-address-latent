@@ -55,11 +55,12 @@ describe("createAddressParser", () => {
 	});
 
 	test("uses chat field labels and administrative prefixes as field boundaries", () => {
-		const parser = createAddressParser(resources);
+		const parser = createAddressParser(resources, { diagnostics: "full" });
 		const raw =
 			"ผู้รับ: Nok Chaiyaporn\nโทร: 0812345678\nที่อยู่: 45 ถนนจันทน์ ตำบลปทุมวัน เขตปทุมวัน กรุงเทพมหานคร 10330";
 
-		expect(parser.parse(raw).fields).toMatchObject({
+		const result = parser.parse(raw);
+		expect(result.fields).toMatchObject({
 			name: "Nok Chaiyaporn",
 			phone: "0812345678",
 			address: "45 ถนนจันทน์",
@@ -68,6 +69,15 @@ describe("createAddressParser", () => {
 			province: "กรุงเทพมหานคร",
 			zipcode: "10330",
 		});
+		expect(
+			result.diagnostics.candidateTrace
+				?.find(
+					(candidate) =>
+						candidate.label === "ADDRESS_DETAIL" &&
+						candidate.outcome === "accepted",
+				)
+				?.evidence.map((item) => item.ruleId),
+		).toContain("address.labeled-value");
 	});
 
 	test("recognizes common chat label variants and separators", () => {
@@ -83,21 +93,25 @@ describe("createAddressParser", () => {
 	});
 
 	test("keeps a title-less person named เมือง separate from the district alias", () => {
-		const parser = createAddressParser({
-			...resources,
-			locations: [
-				{
-					subdistrict: "ธาตุเชิงชุม",
-					district: "เมืองสกลนคร",
-					province: "สกลนคร",
-					zipcode: "47000",
-				},
-			],
-		});
+		const parser = createAddressParser(
+			{
+				...resources,
+				locations: [
+					{
+						subdistrict: "ธาตุเชิงชุม",
+						district: "เมืองสกลนคร",
+						province: "สกลนคร",
+						zipcode: "47000",
+					},
+				],
+			},
+			{ diagnostics: "full" },
+		);
 		const raw =
 			"เมือง ชัยพร\nโทร 0812345678\nบ้านเลขที่ 12 ซอยร่วมใจ ถนนนิตโย ต.ธาตุเชิงชุม อ.เมือง จ.สกลนคร 47000";
 
-		expect(parser.parse(raw).fields).toEqual({
+		const result = parser.parse(raw);
+		expect(result.fields).toEqual({
 			name: "เมือง ชัยพร",
 			phone: "0812345678",
 			address: "บ้านเลขที่ 12 ซอยร่วมใจ ถนนนิตโย",
@@ -106,6 +120,29 @@ describe("createAddressParser", () => {
 			province: "สกลนคร",
 			zipcode: "47000",
 		});
+		expect(result.diagnostics.candidateRejections).toContainEqual({
+			label: "DISTRICT",
+			text: "เมือง",
+			start: 0,
+			end: 5,
+			ruleId: "location.city-unscoped",
+		});
+	});
+
+	test("explains why a title-less first-line recipient was accepted", () => {
+		const parser = createAddressParser(resources, { diagnostics: "full" });
+		const raw =
+			"สมชาย ใจดี\nโทร 0812345678\nบ้านเลขที่ 12 ปทุมวัน ปทุมวัน กรุงเทพมหานคร 10330";
+
+		const result = parser.parse(raw);
+		const acceptedName = result.diagnostics.candidateTrace?.find(
+			(candidate) => candidate.label === "NAME" && candidate.outcome === "accepted",
+		);
+
+		expect(result.fields.name).toBe("สมชาย ใจดี");
+		expect(acceptedName?.evidence.map((item) => item.ruleId)).toContain(
+			"name.titleless-first-line",
+		);
 	});
 
 	test("expands the informal อ.เมือง abbreviation using the province tuple", () => {
@@ -134,6 +171,30 @@ describe("createAddressParser", () => {
 		});
 	});
 
+	test("resolves city alias from the final province mention", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "งิ้วด่อน",
+					district: "เมืองสกลนคร",
+					province: "สกลนคร",
+					zipcode: "47000",
+				},
+				{
+					subdistrict: "ปทุมวัน",
+					district: "ปทุมวัน",
+					province: "กรุงเทพมหานคร",
+					zipcode: "10330",
+				},
+			],
+		});
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ถนนกรุงเทพมหานคร ต.งิ้วด่อน อ.เมือง จ.สกลนคร 47000";
+
+		expect(parser.parse(raw).fields.district).toBe("เมืองสกลนคร");
+	});
+
 	test("keeps road text when an address line has no phone prefix", () => {
 		const parser = createAddressParser({
 			...resources,
@@ -152,6 +213,49 @@ describe("createAddressParser", () => {
 		expect(parser.parse(raw).fields).toMatchObject({
 			address: "บ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก",
 			district: "เมืองสกลนคร",
+		});
+	});
+
+	test("keeps a location-like road name inside address detail", () => {
+		const parser = createAddressParser(resources);
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ถนนปทุมวัน ตำบลปทุมวัน เขตปทุมวัน กรุงเทพมหานคร 10330";
+
+		expect(parser.parse(raw).fields.address).toBe(
+			"บ้านเลขที่ 1 ถนนปทุมวัน",
+		);
+	});
+
+	test("normalizes dotted phones and Thai digits", () => {
+		const parser = createAddressParser(resources);
+		const dotted = parser.parse("นายทดสอบ ใจดี\n081.234.5678");
+		const thai = parser.parse(
+			"นายทดสอบ ใจดี\n๐๘๑-๒๓๔-๕๖๗๘\nบ้านเลขที่ 1 ปทุมวัน ปทุมวัน กรุงเทพมหานคร ๑๐๓๓๐",
+		);
+
+		expect(dotted.fields.phone).toBe("0812345678");
+		expect(thai.fields.phone).toBe("0812345678");
+		expect(thai.fields.zipcode).toBe("10330");
+	});
+
+	test("recognizes administrative prefixes with internal spacing", () => {
+		const parser = createAddressParser(resources);
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ถนนจันทน์ ต .ปทุมวัน อ .ปทุมวัน กรุงเทพมหานคร 10330";
+
+		expect(parser.parse(raw).fields.address).toBe("บ้านเลขที่ 1 ถนนจันทน์");
+	});
+
+	test("keeps an explicitly prefixed subdistrict absent from the gazetteer", () => {
+		const parser = createAddressParser(resources);
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.บางใหม่ เขตปทุมวัน กรุงเทพมหานคร 10330";
+
+		expect(parser.parse(raw).fields).toMatchObject({
+			subdistrict: "บางใหม่",
+			district: "ปทุมวัน",
+			province: "กรุงเทพมหานคร",
+			zipcode: "10330",
 		});
 	});
 
@@ -219,7 +323,10 @@ describe("createAddressParser", () => {
 		expect(() =>
 			createAddressParser({
 				...resources,
-				scoringConfig: { ...resources.scoringConfig, version: "label-mix-v0" as "label-mix-v1" },
+				scoringConfig: {
+					...resources.scoringConfig,
+					version: "label-mix-v0" as "label-mix-v1",
+				} as ParserResources["scoringConfig"],
 			}),
 		).toThrow("Unsupported latent scoring version");
 	});
@@ -229,5 +336,23 @@ describe("createAddressParser", () => {
 		expect(() =>
 			createAddressParser(resources, { minFieldConfidence: Number.NaN }),
 		).toThrow();
+	});
+
+	test("full diagnostics preserve the validator abstention reason", () => {
+		const parser = createAddressParser(resources, {
+			diagnostics: "full",
+			minFieldConfidence: 1,
+		});
+
+		const result = parser.parse("นายทดสอบ ใจดี");
+
+		expect(
+			result.diagnostics.candidateTrace?.some(
+				(candidate) =>
+					candidate.label === "NAME" &&
+					candidate.outcome === "abstained" &&
+					candidate.reason === "low-confidence",
+			),
+		).toBe(true);
 	});
 });

@@ -27,12 +27,15 @@ function adminIds(selected: readonly Candidate[]): readonly number[] | null {
 
 function additionScore(selected: readonly Candidate[], candidate: Candidate): number {
   let score = candidate.score - 0.5;
-  if (["SUBDISTRICT", "DISTRICT", "PROVINCE", "POSTCODE"].includes(candidate.label)) {
+	if (["SUBDISTRICT", "DISTRICT", "PROVINCE", "POSTCODE"].includes(candidate.label)) {
     const existing = adminIds(selected);
     if (existing !== null) {
-      const coherent = candidate.locationIds.length > 0 &&
-        intersect(existing, candidate.locationIds).length > 0;
-      score += coherent ? 0.22 : -0.9;
+			if (candidate.locationIds.length > 0) {
+				const coherent = intersect(existing, candidate.locationIds).length > 0;
+				score += coherent ? 0.22 : -0.9;
+			} else if (candidate.label === "POSTCODE") {
+				score -= 0.9;
+			}
     }
   }
   return score;

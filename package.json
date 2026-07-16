@@ -2,6 +2,7 @@
   "name": "th-address-latent",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.3.5",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -13,15 +14,17 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target browser --format esm",
     "build:demo": "vite build",
     "build:resources": "bun run scripts/build-resources.ts",
+    "check:resource-gate": "bun run scripts/check-resource-gate.ts",
     "bench": "bun run bench/run.ts",
+    "bench:list": "bun run bench/run-list.ts",
     "bench:fixture": "bun run bench/run-fixture.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "1.3.14",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
-    "typescript": "latest",
+    "typescript": "7.0.2",
     "vite": "^8.1.4"
   },
   "dependencies": {

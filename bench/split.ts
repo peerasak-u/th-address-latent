@@ -19,6 +19,99 @@ export interface DatasetSplit {
   readonly evaluation: readonly DatasetRecord[];
 }
 
+export interface TrainingDatasetSplit extends DatasetSplit {
+	readonly development: readonly DatasetRecord[];
+	readonly excluded: readonly DatasetRecord[];
+	readonly method: "location-and-declared-template-held-out";
+}
+
+function validateDeclaredTemplates(records: readonly DatasetRecord[]): void {
+	const declarations = new Map<string, "train" | "evaluation">();
+	for (const record of records) {
+		const { templateFamily, declaredSplit } = record.partition;
+		if (!templateFamily || !declaredSplit) continue;
+		const previous = declarations.get(templateFamily);
+		if (previous && previous !== declaredSplit) {
+			throw new Error(
+				`template family ${templateFamily} appears in both declared splits`,
+			);
+		}
+		declarations.set(templateFamily, declaredSplit);
+	}
+}
+
+/**
+ * Creates train/development/evaluation partitions without sharing an
+ * authoritative location tuple. Generator-declared evaluation template
+ * families are admitted only to evaluation; declared training families are
+ * admitted only to train/development. Ineligible cross-product records are
+ * retained in `excluded` for an auditable resource artifact.
+ */
+export function splitForTraining(
+	records: readonly DatasetRecord[],
+	seed: string,
+	developmentRatio = 0.15,
+	evaluationRatio = 0.2,
+): TrainingDatasetSplit {
+	if (
+		!(developmentRatio > 0) ||
+		!(evaluationRatio > 0) ||
+		developmentRatio + evaluationRatio >= 1
+	) {
+		throw new Error("development and evaluation ratios must be positive and sum below one");
+	}
+	validateDeclaredTemplates(records);
+	const developmentThreshold = Math.floor(developmentRatio * 10_000);
+	const evaluationThreshold = Math.floor(
+		(developmentRatio + evaluationRatio) * 10_000,
+	);
+	const groups = new Map<string, DatasetRecord[]>();
+	for (const record of records) {
+		const key = locationKey(record);
+		const group = groups.get(key) ?? [];
+		group.push(record);
+		groups.set(key, group);
+	}
+
+	const train: DatasetRecord[] = [];
+	const development: DatasetRecord[] = [];
+	const evaluation: DatasetRecord[] = [];
+	const excluded: DatasetRecord[] = [];
+	for (const [key, group] of groups) {
+		const bucket = hash(`${seed}\u0000partition\u0000${key}`) % 10_000;
+		const partition = bucket < developmentThreshold
+			? "development"
+			: bucket < evaluationThreshold
+				? "evaluation"
+				: "train";
+		for (const record of group) {
+			const declared = record.partition.declaredSplit;
+			const eligible = partition === "evaluation"
+				? declared !== "train"
+				: declared !== "evaluation";
+			if (!eligible) {
+				excluded.push(record);
+			} else if (partition === "development") {
+				development.push(record);
+			} else if (partition === "evaluation") {
+				evaluation.push(record);
+			} else {
+				train.push(record);
+			}
+		}
+	}
+	if (train.length === 0 || development.length === 0 || evaluation.length === 0) {
+		throw new Error("split produced an empty train, development, or evaluation partition");
+	}
+	return {
+		train,
+		development,
+		evaluation,
+		excluded,
+		method: "location-and-declared-template-held-out",
+	};
+}
+
 export function splitByLocation(
   records: readonly DatasetRecord[],
   seed: string,

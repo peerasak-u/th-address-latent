@@ -57,10 +57,17 @@ export function validateDecodeResult(
     !postcodeWithoutTuple &&
     (evidencedAdmin.length <= 1 || (intersection !== null && intersection.length > 0));
 
-  for (const candidate of decoded.selected) {
-    const field = labelToField(candidate.label);
-    if (candidate.start < 0 || candidate.end > raw.length || candidate.start >= candidate.end) continue;
-    if (raw.slice(candidate.start, candidate.end) !== candidate.text) continue;
+	for (const candidate of decoded.selected) {
+		const field = labelToField(candidate.label);
+		if (
+			candidate.start < 0 ||
+			candidate.end > raw.length ||
+			candidate.start >= candidate.end ||
+			raw.slice(candidate.start, candidate.end) !== candidate.text
+		) {
+			abstentions.push({ field, reason: "invalid-offset" });
+			continue;
+		}
 
     if (
       !locationConsistent &&

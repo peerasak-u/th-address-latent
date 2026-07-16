@@ -34,15 +34,35 @@ export interface LabelDirection {
 }
 
 export interface LatentFeatureConfig {
-	readonly version: "char-ngram-v2";
+	readonly version: "char-ngram-v2" | "candidate-hash-v3";
 	readonly minCharacterNgram: number;
 	readonly maxCharacterNgram: number;
+	readonly contextWindow?: number;
 }
 
-export interface LatentScoringConfig {
+export interface LegacyLatentScoringConfig {
 	readonly version: "label-mix-v1";
 	readonly latentWeightByLabel: Readonly<Record<OutputLabel, number>>;
 }
+
+export interface ResidualLatentScoringConfig {
+	readonly version: "residual-rank-v2";
+	readonly residualScaleByLabel: Readonly<Record<OutputLabel, number>>;
+	readonly maxAbsoluteResidualLogit: number;
+}
+
+export type LatentScoringConfig =
+	| LegacyLatentScoringConfig
+	| ResidualLatentScoringConfig;
+
+export type CandidateSource =
+	| "recipient"
+	| "structured"
+	| "phone"
+	| "postcode"
+	| "administrative"
+	| "gazetteer"
+	| "segment";
 
 export interface ParserResources {
 	readonly version: string;
@@ -58,6 +78,7 @@ export interface ParserOptions {
 	readonly beamWidth?: number;
 	readonly candidatesPerLabel?: number;
 	readonly minFieldConfidence?: number;
+	readonly diagnostics?: "summary" | "full";
 }
 
 export interface ParsedFields {
@@ -82,6 +103,7 @@ export interface ParsedSpan {
 export interface Abstention {
 	readonly field: FieldName;
 	readonly reason:
+		| "invalid-offset"
 		| "low-confidence"
 		| "invalid-format"
 		| "inconsistent-location";
@@ -92,7 +114,47 @@ export interface ParseDiagnostics {
 	readonly resourceChecksum?: string;
 	readonly candidatesEvaluated: number;
 	readonly hypothesesEvaluated: number;
-	readonly latentScoring: "frozen-direction";
+	readonly latentScoring:
+		| "frozen-direction"
+		| "sparse-residual"
+		| "evidence-only";
+	readonly scoreSemantics: "uncalibrated-selection-score";
+	readonly candidateTrace?: readonly CandidateTrace[];
+	readonly candidateRejections?: readonly CandidateRejection[];
+}
+
+export interface CandidateRejection {
+	readonly label: OutputLabel;
+	readonly text: string;
+	readonly start: number;
+	readonly end: number;
+	readonly ruleId: string;
+}
+
+export interface EvidenceContribution {
+	readonly ruleId: string;
+	readonly effect: "base" | "add" | "floor" | "reject" | "resolve";
+	readonly value: number;
+}
+
+export interface CandidateTrace {
+	readonly label: OutputLabel;
+	readonly text: string;
+	readonly canonical: string;
+	readonly start: number;
+	readonly end: number;
+	readonly evidenceScore: number;
+	readonly latentScore: number;
+	readonly score: number;
+	readonly source?: CandidateSource;
+	readonly evidence: readonly EvidenceContribution[];
+	readonly outcome: "accepted" | "pruned" | "abstained";
+	readonly reason?:
+		| Abstention["reason"]
+		| "below-threshold"
+		| "overlap"
+		| "lower-ranked"
+		| "beam-pruned";
 }
 
 export interface ParseResult {
@@ -117,7 +179,9 @@ export interface Candidate {
 	readonly latentScore: number;
 	readonly evidenceScore: number;
 	readonly score: number;
+	readonly source?: CandidateSource;
 	readonly locationIds: readonly number[];
+	readonly evidence: readonly EvidenceContribution[];
 }
 
 export interface DecodeResult {
