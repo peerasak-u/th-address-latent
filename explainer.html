@@ -70,6 +70,13 @@
       .walk-field { padding:10px 11px; border:1px solid #dedbd1; border-radius:9px; background:#fffdf8; }
       .walk-field small { display:block; color:#e96744; font:500 10px "DM Mono",monospace; }
       .walk-field span { display:block; margin-top:3px; color:#20253b; font-size:12px; }
+      .walk-nerd { grid-column:1 / -1; overflow:auto; margin-top:14px; padding:14px; border-radius:11px; color:#d9dfd0; background:#171b2c; font:11px/1.7 "DM Mono","Noto Sans Thai",monospace; }
+      .walk-nerd table { width:100%; border-collapse:collapse; min-width:700px; }
+      .walk-nerd th { color:#efaf79; font-weight:500; text-align:left; }
+      .walk-nerd td,.walk-nerd th { padding:5px 8px; border-bottom:1px solid rgb(255 255 255 / 9%); white-space:nowrap; }
+      .walk-nerd .accepted { color:#b9e0ae; }
+      .walk-nerd .pruned { color:#efaf79; }
+      .walk-nerd .muted { color:#858998; }
       .walk-progress { display:flex; gap:5px; margin:0 0 17px; }
       .walk-progress i { flex:1; height:4px; border-radius:9px; background:#dedbd1; }
       .walk-progress i.active { background:#e96744; }
@@ -216,6 +223,35 @@ location labels w = 0.55</pre><p>นี่คือเหตุผลที่�
           marks: [["คุณปิยะดา แสงคำ", "name"], ["089-123-4567", "phone"], ["บ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก", "address"], ["งิ้วด่อน", "location"], ["เมือง", "location"], ["สกลนคร", "location"], ["47000", "location"]]
         }
       ];
+      // Recorded by running createAddressParser(resources) with diagnostics:"full".
+      // Keep this snapshot next to the explainer so the numbers are inspectable,
+      // while the live parser remains the source of truth in the package.
+      const walkRuntime = [
+        { confidence: 0.978, candidatesEvaluated: 72, hypothesesEvaluated: 1926, candidates: [
+          { label:"NAME", text:"คุณธีรภัทร ใจดี", evidence:0.97, latent:0.986, score:0.997, source:"recipient", ids:0, rules:"name.titleless-first-line:+0.97", outcome:"accepted" },
+          { label:"NAME", text:"โทร", evidence:0.62, latent:0.946, score:0.952, source:"segment", ids:0, rules:"name.script-shape:+0.62", outcome:"pruned · lower-ranked" },
+          { label:"PHONE", text:"0812345678", evidence:0.99, latent:0.5, score:0.99, source:"phone", ids:0, rules:"phone.pattern:+0.99", outcome:"accepted" },
+          { label:"ADDRESS_DETAIL", text:"99/12 ม.4 ซ.สุขใจ 3 ถ.นิตโย", evidence:1.02, latent:0.5, score:1.02, source:"segment", ids:0, rules:"numeric-prefix + before-administrative + line-start", outcome:"accepted" },
+          { label:"ADDRESS_DETAIL", text:"99/12 … ต.ธาตุเชิงชุม", evidence:1.02, latent:0.5, score:1.02, source:"segment", ids:0, rules:"numeric-prefix + line-start", outcome:"pruned · overlap" },
+          { label:"SUBDISTRICT", text:"ธาตุเชิงชุม", evidence:0.98, latent:0.5, score:0.98, source:"administrative", ids:1, rules:"location.prefixed-value:+0.98", outcome:"accepted" },
+          { label:"SUBDISTRICT", text:"ธาตุ", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:5, rules:"location.gazetteer:+0.96", outcome:"pruned · overlap" },
+          { label:"DISTRICT", text:"เมือง → เมืองสกลนคร", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:16, rules:"location.city-resolved:+0.96", outcome:"accepted" },
+          { label:"PROVINCE", text:"สกลนคร", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:125, rules:"location.gazetteer:+0.96", outcome:"accepted" },
+          { label:"POSTCODE", text:"47000", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:13, rules:"location.gazetteer:+0.96", outcome:"accepted" }
+        ]},
+        { confidence: 0.981, candidatesEvaluated: 82, hypothesesEvaluated: 1818, candidates: [
+          { label:"NAME", text:"คุณปิยะดา แสงคำ", evidence:0.97, latent:0.998, score:0.997, source:"recipient", ids:0, rules:"name.titleless-first-line:+0.97", outcome:"accepted" },
+          { label:"NAME", text:"บ้านเลขที่", evidence:0.12, latent:0.568, score:0.152, source:"segment", ids:0, rules:"script-shape + address-signal:-0.50", outcome:"pruned · below-threshold" },
+          { label:"PHONE", text:"089-123-4567", evidence:0.99, latent:0.5, score:0.99, source:"phone", ids:0, rules:"phone.pattern:+0.99", outcome:"accepted" },
+          { label:"ADDRESS_DETAIL", text:"บ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก", evidence:1.02, latent:0.5, score:1.02, source:"segment", ids:0, rules:"keyword + before-administrative + line-start", outcome:"accepted" },
+          { label:"ADDRESS_DETAIL", text:"บ้านเลขที่ … ต.งิ้วด่อน", evidence:1.02, latent:0.5, score:1.02, source:"segment", ids:0, rules:"keyword + line-start", outcome:"pruned · overlap" },
+          { label:"SUBDISTRICT", text:"งิ้วด่อน", evidence:0.98, latent:0.5, score:0.98, source:"administrative", ids:1, rules:"location.prefixed-value:+0.98", outcome:"accepted" },
+          { label:"SUBDISTRICT", text:"งิ้ว", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:3, rules:"location.gazetteer:+0.96", outcome:"pruned · overlap" },
+          { label:"DISTRICT", text:"เมือง → เมืองสกลนคร", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:16, rules:"location.city-resolved:+0.96", outcome:"accepted" },
+          { label:"PROVINCE", text:"สกลนคร", evidence:0.98, latent:0.5, score:0.98, source:"administrative", ids:125, rules:"location.prefixed-value:+0.98", outcome:"accepted" },
+          { label:"POSTCODE", text:"47000", evidence:0.96, latent:0.5, score:0.96, source:"gazetteer", ids:13, rules:"location.gazetteer:+0.96", outcome:"accepted" }
+        ]}
+      ];
       const walkSteps = [
         ["Step 1", "รับข้อความดิบ", "ตัว parser รับ string เดียวก่อน ยังไม่สรุปว่าคำไหนเป็น field ไหน", "parse(raw) → context"],
         ["Step 2", "สร้าง candidate", "regex, label hint และ gazetteer สร้างตัวเลือกหลายช่วง เช่น ชื่อ, เบอร์, ช่วง address และชื่อพื้นที่ — ยังไม่เลือกผู้ชนะ", "generateCandidates(raw) → spans[]"],
@@ -232,18 +268,26 @@ location labels w = 0.55</pre><p>นี่คือเหตุผลที่�
         ranges.forEach((range) => { if (range.start < cursor) return; html += esc(raw.slice(cursor, range.start)); html += `<span class="mark ${range.type}">${esc(range.text)}</span>`; cursor = range.end; });
         return html + esc(raw.slice(cursor));
       }
+      function nerdTable(runtime, mode) {
+        const columns = mode === "score" ? ["label", "span", "evidence", "latent", "score", "outcome"] : ["label", "span", "evidence", "latent", "source", "ids", "rules"];
+        const header = columns.map((column) => `<th>${column}</th>`).join("");
+        const rows = runtime.candidates.map((candidate) => `<tr class="${candidate.outcome.startsWith("accepted") ? "accepted" : "pruned"}">${columns.map((column) => { const value = column === "span" ? candidate.text : column === "outcome" ? candidate.outcome : column === "evidence" ? candidate.evidence.toFixed(3) : column === "latent" ? candidate.latent.toFixed(3) : column === "score" ? candidate.score.toFixed(3) : column === "ids" ? candidate.ids : candidate[column]; return `<td>${esc(String(value ?? ""))}</td>`; }).join("")}</tr>`).join("");
+        return `<div class="walk-nerd"><div class="muted">runtime snapshot · construction-v3-residual-name-d2048 · ${runtime.candidatesEvaluated} candidates · ${runtime.hypothesesEvaluated} hypotheses</div><table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
       function renderWalk() {
         const record = walkData[walkRecord]; const step = walkSteps[walkStep];
+        const runtime = walkRuntime[walkRecord];
         document.querySelector("#walk-input").innerHTML = highlighted(record.raw, record.marks, walkStep);
         document.querySelector("#walk-kicker").textContent = step[0]; document.querySelector("#walk-title").textContent = step[1]; document.querySelector("#walk-description").textContent = step[2]; document.querySelector("#walk-code").textContent = step[3];
         document.querySelectorAll("#walk-records .walk-btn").forEach((b, i) => b.classList.toggle("active", i === walkRecord));
         document.querySelectorAll("#walk-steps .walk-btn").forEach((b, i) => b.classList.toggle("active", i === walkStep));
         document.querySelector("#walk-progress").innerHTML = walkSteps.map((_, i) => `<i class="${i <= walkStep ? "active" : ""}"></i>`).join("");
         const output = document.querySelector("#walk-output");
-        if (walkStep === 4) output.innerHTML = Object.entries(record.fields).map(([key, value]) => `<div class="walk-field"><small>${key}</small><span>${esc(value)}</span></div>`).join("");
-        else if (walkStep === 1) output.innerHTML = ["NAME · คุณ…", "PHONE · 081…", "ADDRESS_DETAIL · 99/12…", "SUBDISTRICT · ธาตุ…", "DISTRICT · เมือง", "POSTCODE · 47000"].map((x) => `<div class="walk-field"><span>${x}</span></div>`).join("");
-        else if (walkStep === 2) output.innerHTML = ["evidence: phone shape", "evidence: address markers", "locationIds: tuple", "NAME residual: active", "ADDRESS residual: 0"].map((x) => `<div class="walk-field"><span>${x}</span></div>`).join("");
-        else output.innerHTML = `<div class="walk-field"><small>ตอนนี้</small><span>${walkStep === 0 ? "ยังเป็น string เดียว" : "กำลังเตรียมชุดคำตอบ"}</span></div>`;
+        if (walkStep === 4) output.innerHTML = Object.entries(record.fields).map(([key, value]) => `<div class="walk-field"><small>${key}</small><span>${esc(value)}</span></div>`).join("") + `<div class="walk-nerd"><div class="muted">validator output · confidence ${runtime.confidence.toFixed(3)} · score semantics: uncalibrated-selection-score</div></div>`;
+        else if (walkStep === 1) output.innerHTML = `<div class="walk-field"><small>generated</small><span>${runtime.candidatesEvaluated} candidates</span></div>` + nerdTable(runtime, "features");
+        else if (walkStep === 2) output.innerHTML = nerdTable(runtime, "features");
+        else if (walkStep === 3) output.innerHTML = nerdTable(runtime, "score");
+        else output.innerHTML = `<div class="walk-field"><small>runtime</small><span>raw.length = ${record.raw.length} UTF-16 code units</span></div>`;
       }
       walkData.forEach((record, i) => { const button = document.createElement("button"); button.className = "walk-btn"; button.textContent = record.label; button.addEventListener("click", () => { walkRecord = i; renderWalk(); }); document.querySelector("#walk-records").appendChild(button); });
       walkSteps.forEach((step, i) => { const button = document.createElement("button"); button.className = "walk-btn"; button.textContent = step[0]; button.addEventListener("click", () => { walkStep = i; renderWalk(); }); document.querySelector("#walk-steps").appendChild(button); });
