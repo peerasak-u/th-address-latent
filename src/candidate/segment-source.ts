@@ -3,6 +3,18 @@ import { overlaps, trimRange } from "./context";
 import { evaluateSegmentEvidence } from "./evidence-rules";
 import type { CandidateSeedStore } from "./seed-store";
 
+function trimSegmentRange(
+	raw: string,
+	start: number,
+	end: number,
+): SpanRange | null {
+	const range = trimRange(raw, start, end);
+	if (!range) return null;
+	end = range.end;
+	while (end > range.start && /[,;]/u.test(raw[end - 1] ?? "")) end -= 1;
+	return trimRange(raw, range.start, end);
+}
+
 export function addSegmentCandidates(
 	context: ParseContext,
 	store: CandidateSeedStore,
@@ -44,12 +56,11 @@ export function addSegmentCandidates(
 			) {
 				continue;
 			}
-			const range = trimRange(context.raw, rawStart, rawEnd);
-			if (!range || anchors.some((anchor) => overlaps(anchor, range))) continue;
-			if (context.excludedRanges.some((item) => overlaps(item, range))) continue;
+			const range = trimSegmentRange(context.raw, rawStart, rawEnd);
+			if (!range) continue;
 			const text = context.raw.slice(range.start, range.end);
 			if (text.length < 2) continue;
-			addSegmentPair(context, range, store);
+			addSegmentPair(context, range, anchors, store);
 		}
 	}
 }
@@ -57,19 +68,35 @@ export function addSegmentCandidates(
 function addSegmentPair(
 	context: ParseContext,
 	range: SpanRange,
+	anchors: readonly SpanRange[],
 	store: CandidateSeedStore,
 ): void {
 	const evidence = evaluateSegmentEvidence(context, range);
-	store.add({
-		label: "NAME",
-		...range,
-		evidence: evidence.name.value,
-		evidenceTrace: evidence.name.contributions,
-	});
-	store.add({
-		label: "ADDRESS_DETAIL",
-		...range,
-		evidence: evidence.address.value,
-		evidenceTrace: evidence.address.contributions,
-	});
+	if (
+		!anchors.some((anchor) => overlaps(anchor, range)) &&
+		!context.excludedRanges.some((item) => overlaps(item, range))
+	) {
+		store.add({
+			label: "NAME",
+			...range,
+			evidence: evidence.name.value,
+			evidenceTrace: evidence.name.contributions,
+		});
+	}
+	const addressProtectedRanges = [
+		...context.phoneRanges,
+		...context.postcodeRanges,
+		...context.recipientLabels,
+		...context.phoneLabels,
+		...context.addressLabels,
+		...context.separators,
+	];
+	if (!addressProtectedRanges.some((item) => overlaps(item, range))) {
+		store.add({
+			label: "ADDRESS_DETAIL",
+			...range,
+			evidence: evidence.address.value,
+			evidenceTrace: evidence.address.contributions,
+		});
+	}
 }

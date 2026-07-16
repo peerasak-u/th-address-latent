@@ -8,10 +8,12 @@ export interface CandidateSeed {
 	readonly evidence: number;
 	readonly evidenceTrace?: readonly EvidenceContribution[];
 	readonly locationId?: number;
+	readonly scopeLocationId?: boolean;
 }
 
 function seedKey(seed: CandidateSeed): string {
-	return `${seed.label}\u0000${seed.start}\u0000${seed.end}\u0000${seed.canonical ?? ""}`;
+	const locationScope = seed.scopeLocationId ? `\u0000${seed.locationId ?? "none"}` : "";
+	return `${seed.label}\u0000${seed.start}\u0000${seed.end}\u0000${seed.canonical ?? ""}${locationScope}`;
 }
 
 export class CandidateSeedStore {

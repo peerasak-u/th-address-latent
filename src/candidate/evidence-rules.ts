@@ -14,6 +14,10 @@ interface SegmentFacts {
 	readonly followsRecipientLabel: boolean;
 	readonly firstRecipientLine: boolean;
 	readonly followsAddressLabel: boolean;
+	readonly endsBeforeAdministrative: boolean;
+	readonly administrativePrefixCount: number;
+	readonly startsLine: boolean;
+	readonly hasComma: boolean;
 	readonly thaiRatio: number;
 }
 
@@ -120,6 +124,38 @@ const RULES: readonly EvidenceRule[] = [
 		value: -0.4,
 		when: (facts) => facts.hasTitle,
 	},
+	{
+		id: "address.before-administrative",
+		target: "ADDRESS_DETAIL",
+		priority: 0,
+		effect: "add",
+		value: 0.04,
+		when: (facts) => facts.endsBeforeAdministrative,
+	},
+	{
+		id: "address.contains-multiple-administrative-prefixes",
+		target: "ADDRESS_DETAIL",
+		priority: 0,
+		effect: "add",
+		value: -0.08,
+		when: (facts) => facts.administrativePrefixCount > 1,
+	},
+	{
+		id: "address.line-start",
+		target: "ADDRESS_DETAIL",
+		priority: 0,
+		effect: "add",
+		value: 0.04,
+		when: (facts) => facts.startsLine,
+	},
+	{
+		id: "address.comma-before-administrative",
+		target: "ADDRESS_DETAIL",
+		priority: 0,
+		effect: "add",
+		value: -0.02,
+		when: (facts) => facts.hasComma && facts.administrativePrefixCount > 0,
+	},
 ];
 
 function segmentFacts(
@@ -142,6 +178,23 @@ function segmentFacts(
 		followsAddressLabel: context.addressLabels.some(
 			(label) => context.raw.slice(label.end, range.start).trim().length === 0,
 		),
+		endsBeforeAdministrative: context.coherentAdministrativeRanges.some(
+			(administrative) =>
+				administrative.start >= range.end &&
+				context.raw.slice(range.end, administrative.start).trim().length === 0,
+		),
+		administrativePrefixCount: context.administrativeRanges.filter(
+			(administrative) =>
+				range.start < administrative.end && administrative.start < range.end,
+		).length,
+		startsLine:
+			range.start === 0 ||
+			context.separators.some(
+				(separator) =>
+					separator.end <= range.start &&
+					context.raw.slice(separator.end, range.start).trim().length === 0,
+			),
+		hasComma: text.includes(","),
 		thaiRatio:
 			(text.match(/[ก-๙]/gu)?.length ?? 0) /
 			Math.max(1, Array.from(text).length),

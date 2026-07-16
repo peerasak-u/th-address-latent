@@ -4,6 +4,7 @@ import {
 	createCandidateFunnel,
 	summarizeCandidateFunnel,
 } from "../bench/funnel";
+import { exactAcceptance } from "../bench/metrics";
 import type { ExpectedAddress } from "../bench/dataset";
 import type { ParseResult } from "../src/types";
 import { parseRecipientList } from "../bench/list-dataset";
@@ -143,4 +144,16 @@ test("calibration reports accepted-span Brier score and expected calibration err
 
 	expect(summary.brierScore).toBeCloseTo(0.01);
 	expect(summary.expectedCalibrationError).toBeCloseTo(0.1);
+});
+
+test("95 percent exact acceptance requires 56 of 58 records", () => {
+	expect(exactAcceptance({ records: 58, exactRecords: 55 }, 0.95)).toEqual({
+		minimumAccuracy: 0.95,
+		requiredExactRecords: 56,
+		actualExactRecords: 55,
+		passed: false,
+	});
+	expect(exactAcceptance({ records: 58, exactRecords: 56 }, 0.95).passed).toBe(
+		true,
+	);
 });

@@ -6,7 +6,6 @@ interface PromotionGate {
 	readonly passed: boolean;
 	readonly failures: readonly string[];
 	readonly grandfathered?: boolean;
-	readonly grandfatheredReason?: string;
 }
 
 interface GeneratedResourceArtifact {
@@ -60,9 +59,7 @@ for (const path of shippedResourcePaths) {
 	if (!gate) {
 		failures.push(`${path}: no promotionGate field (predates the ADR-0002 gate)`);
 	} else if (gate.grandfathered) {
-		if (!gate.grandfatheredReason) {
-			failures.push(`${path}: promotionGate.grandfathered is set without a grandfatheredReason`);
-		}
+		failures.push(`${path}: grandfathered resources cannot be shipped`);
 	} else if (!gate.enforced) {
 		failures.push(`${path}: promotionGate.enforced is false (built with --skip-gate)`);
 	} else if (!gate.passed) {

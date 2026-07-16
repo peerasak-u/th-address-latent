@@ -1,6 +1,8 @@
 # th-address-latent
 
-Browser-compatible Thai address extraction experiment using frozen character-latent directions, soft candidate pruning, and deterministic validation.
+Browser-compatible Thai address extraction using typed candidate evidence, soft
+candidate pruning, deterministic validation, and optional gated frozen
+character directions.
 
 ## Why Validator and Pruner are separate
 
@@ -26,14 +28,14 @@ bun run build:resources \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/construction-v1.jsonl \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/name-robust-v1-2040-r1.jsonl \
   --gazetteer ~/Workspace/indie/thai-address-synth-dataset/data/subdistricts.json \
-  --output .bench-results/resources/combined-v3-gold.json \
-  --resource-version combined-v3-gold \
+  --output .bench-results/resources/combined-v3-no-directions.json \
+  --resource-version combined-v3-no-directions \
   --seed 20260720 \
   --dimension 512 \
   --max-character-ngram 4 \
   --dataset-balance equal-family \
   --negative-policy other-spans \
-  --fit-mode gold-centroid
+  --fit-mode none
 ```
 
 Run the exploratory head-to-head benchmark:
@@ -55,8 +57,12 @@ match the reviewed supplement fixture:
 bun run bench:list \
   --input /path/to/private-recipient-list.txt \
   --resources resources/generated/construction-v2-ngram4-d512.json \
+  --min-exact-accuracy 0.95 \
   --output .bench-results/recipient-list.json
 ```
+
+The list benchmark defaults to a 95% exact-record acceptance threshold and exits
+non-zero below it. For 58 records this requires at least 56 exact records.
 
 `bench/private/` is gitignored; keep private input lists there.
 
@@ -82,9 +88,10 @@ Resource builds accept:
 ```text
 --dataset-balance uniform-records|equal-family
 --negative-policy output-only|other-spans
---fit-mode gold-centroid|candidate-contrastive
+--fit-mode none|gold-centroid|candidate-contrastive
 ```
 
+`none` writes the deterministic candidate engine without frozen directions.
 Candidate-contrastive fitting uses generated wrong candidates as hard negatives.
 It remains experimental and must beat the matching `noDirections` ablation
 before promotion.
@@ -92,7 +99,7 @@ before promotion.
 `bun run build:resources` exits non-zero if the built resource loses its
 `noDirections` ablation. Pass `--skip-gate` to write an unpromoted experiment
 artifact anyway. Check that every shipped resource still passes its recorded
-gate (or is explicitly grandfathered with a reason) with:
+gate with:
 
 ```bash
 bun run check:resource-gate
@@ -116,17 +123,22 @@ The browser receives a frozen resource artifact. It does not fit directions, mut
 
 Every artifact records its feature schema and character n-gram range. Runtime accepts only the current `char-ngram-v2` schema, so frozen directions cannot be paired accidentally with changed feature semantics. The first controlled v2 experiment uses character 1–4 grams and a 512-dimensional hash vector. Rebuild resources whenever the feature configuration changes.
 
-## Current exploratory verdict
+## Current benchmark verdict
 
-Snapshot `construction-v1-1b063cf770f2` contained 473 records: 394 for direction construction and 79 location-grouped evaluation records.
+The shipped `construction-v3-no-directions` resource is the deterministic
+baseline because every tested frozen-direction fit lost its ablation. The
+combined location-tuple-held-out evaluation contains 569 records.
 
 | Parser | Exact-record accuracy |
 |---|---:|
-| Full hybrid with frozen directions | 10.1% |
-| Same hybrid without directions | 12.7% |
-| Legacy regex parser | 1.3% |
+| Shipped deterministic parser | 70.7% |
+| Matching `noDirections` ablation | 70.7% |
+| Legacy regex parser | 0.4% |
 
-The hybrid pipeline currently handles the synthetic no-space format much better than the legacy parser, but the first character-centroid latent directions **hurt** exact-record accuracy. The latent mechanism has therefore not passed its ablation gate. Name/address boundary scoring is the main bottleneck; the next readout must beat `noDirections` before it becomes the default.
+The private aggregate-only 58-record acceptance benchmark passes at 56/58 exact
+records (96.6%). Name, phone, subdistrict, district, and postcode are 100%; the
+remaining misses are one address and one province. This is a regression gate,
+not a production-accuracy claim.
 
 ## Evaluation policy
 

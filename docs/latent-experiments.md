@@ -1,5 +1,22 @@
 # Latent feature experiments
 
+## Promoted deterministic v3 baseline
+
+The shipped `construction-v3-no-directions` artifact contains no frozen label
+directions. It was rebuilt from the 801-record construction family and the
+2,040-record name-robust family, with 2,272 training-partition records and 569
+location-tuple-held-out evaluation records. Its recorded promotion gate passes
+because it is the matching deterministic `noDirections` baseline.
+
+| Evaluation | Exact | NAME | ADDRESS_DETAIL |
+|---|---:|---:|---:|
+| Combined held-out (569) | 70.7% | 85.1% | 82.1% |
+| Private aggregate list (58) | 96.6% | 100% | 98.3% |
+
+The private list report contains aggregate metrics and checksums only. The 95%
+acceptance threshold requires 56/58 exact records and now passes. The list stays
+a regression gate rather than evidence of 95% production accuracy.
+
 ## Experiment: `char-ngram-v2`, 1–4 grams, 512 dimensions
 
 This controlled experiment changes only the frozen latent feature representation:

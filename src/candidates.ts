@@ -29,7 +29,7 @@ export function createCandidateEngine(
 				const key = `${rejection.label}\u0000${rejection.start}\u0000${rejection.end}\u0000${rejection.ruleId}`;
 				rejections.set(key, rejection);
 			};
-			addStructuredCandidates(context, store);
+			addStructuredCandidates(context, resources.locations, store);
 			addLocationCandidates(
 				context,
 				locationTerms,

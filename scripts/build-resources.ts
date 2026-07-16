@@ -136,8 +136,10 @@ if (!["output-only", "other-spans"].includes(negativePolicy)) {
 	throw new Error("--negative-policy must be output-only or other-spans");
 }
 const fitMode = argument("--fit-mode", "gold-centroid");
-if (!["gold-centroid", "candidate-contrastive"].includes(fitMode)) {
-	throw new Error("--fit-mode must be gold-centroid or candidate-contrastive");
+if (!["none", "gold-centroid", "candidate-contrastive"].includes(fitMode)) {
+	throw new Error(
+		"--fit-mode must be none, gold-centroid, or candidate-contrastive",
+	);
 }
 if (!Number.isInteger(dimension) || dimension <= 0)
 	throw new Error("--dimension must be positive");
@@ -226,7 +228,9 @@ const recordWeight = (record: { readonly id?: string }): number => {
 	if (!familySize) throw new Error(`missing dataset family for ${record.id}`);
 	return split.train.length / (familyRecords.length * familySize);
 };
-const labelDirections = fitMode === "candidate-contrastive"
+const labelDirections = fitMode === "none"
+	? []
+	: fitMode === "candidate-contrastive"
 	? fitCandidateDirections(
 		split.train,
 		{

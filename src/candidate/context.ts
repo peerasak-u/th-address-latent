@@ -10,6 +10,7 @@ export interface ParseContext {
 	readonly phoneRanges: readonly SpanRange[];
 	readonly postcodeRanges: readonly SpanRange[];
 	readonly administrativeRanges: readonly SpanRange[];
+	readonly coherentAdministrativeRanges: readonly SpanRange[];
 	readonly addressHintRanges: readonly SpanRange[];
 	readonly titleHintRanges: readonly SpanRange[];
 	readonly recipientLabels: readonly SpanRange[];
@@ -21,13 +22,13 @@ export interface ParseContext {
 }
 
 const PHONE_PATTERN =
-	/(?<!\d)(?:(?:\+66|0066)[-\s]?[1-9]\d?(?:[-\s]?\d){7,8}|0[2-9]\d?(?:[-\s]?\d){6,8})(?!\d)/gu;
-const POSTCODE_PATTERN = /(?<!\d)\d{5}(?!\d)/gu;
+	/(?<![0-9๐-๙])(?:(?:\+66|0066)[-.\s]?[1-9๑-๙][0-9๐-๙]?(?:[-.\s]?[0-9๐-๙]){7,8}|[0๐][2-9๒-๙][0-9๐-๙]?(?:[-.\s]?[0-9๐-๙]){6,8})(?![0-9๐-๙])/gu;
+const POSTCODE_PATTERN = /(?<![0-9๐-๙])[0-9๐-๙]{5}(?![0-9๐-๙])/gu;
 const ADDRESS_HINT =
 	/(?:บ้านเลขที่|เลขที่|หมู่บ้าน|คอนโดมิเนียม|คอนโด|อพาร์ทเม้นท์|อพาร์ตเมนต์|หอพัก|โรงพยาบาล|โรงแรม|โรงงาน|โกดัง|ตลาด|คลินิก|ร้าน|โรงเรียน|อาคาร|โครงการ|สำนักงาน|ถนน|ซอย|ตึก|\d+(?:\/\d+)?)/gu;
 const TITLE_HINT =
 	/(?:เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.|นาย|นางสาว|นาง|น\.ส\.|ดร\.|คุณ|พระ|อาจารย์|ศาสตราจารย์)/gu;
-const ADMIN_HINT = /(?:แขวง|ตำบล|ต\.|เขต|อำเภอ|อ\.|จังหวัด|จ\.)\s*/gu;
+const ADMIN_HINT = /(?:แขวง|ตำบล|ต\s*\.|เขต|อำเภอ|อ\s*\.|จังหวัด|จ\s*\.|(?<![ก-๙])[ตอจ](?=\s+[ก-๙]))\s*/gu;
 const RECIPIENT_LABEL = /(?:ชื่อผู้รับ|ผู้รับ|ชื่อ)\s*[:：]\s*/gu;
 const PHONE_LABEL = /(?:เบอร์โทร|โทรศัพท์|โทร|เบอร์)\s*[:：]\s*/gu;
 const ADDRESS_LABEL = /(?:ที่อยู่จัดส่ง|ที่อยู่|ส่งที่)\s*[:：]\s*/gu;
@@ -77,6 +78,27 @@ export function buildParseContext(
 	const phoneRanges = matches(PHONE_PATTERN, raw);
 	const postcodeRanges = matches(POSTCODE_PATTERN, raw);
 	const administrativeRanges = matches(ADMIN_HINT, raw);
+	const coherentAdministrativeRanges = administrativeRanges.filter((range) => {
+		const prefix = raw.slice(range.start, range.end).replace(/\s/gu, "");
+		const label = /^(?:แขวง|ตำบล|ต\.)/u.test(prefix)
+			? "SUBDISTRICT"
+			: /^(?:เขต|อำเภอ|อ\.)/u.test(prefix)
+				? "DISTRICT"
+				: /^(?:จังหวัด|จ\.)/u.test(prefix)
+					? "PROVINCE"
+					: prefix === "ต"
+						? "SUBDISTRICT"
+						: prefix === "อ"
+							? "DISTRICT"
+							: prefix === "จ"
+								? "PROVINCE"
+								: null;
+		if (!label) return false;
+		return locationTerms.some(
+			(term) =>
+				term.label === label && raw.startsWith(term.surface, range.end),
+		);
+	});
 	const addressHintRanges = matches(ADDRESS_HINT, raw);
 	const titleHintRanges = matches(TITLE_HINT, raw);
 	const recipientLabels = matches(RECIPIENT_LABEL, raw);
@@ -88,13 +110,18 @@ export function buildParseContext(
 			.filter((term) => term.label === "PROVINCE")
 			.map((term) => term.surface),
 	)]
-		.filter((province) => raw.includes(province))
-		.sort((left, right) => right.length - left.length)[0];
+		.map((province) => ({ province, start: raw.lastIndexOf(province) }))
+		.filter((mention) => mention.start >= 0)
+		.sort(
+			(left, right) =>
+				right.start - left.start || right.province.length - left.province.length,
+		)[0]?.province;
 	return {
 		raw,
 		phoneRanges,
 		postcodeRanges,
 		administrativeRanges,
+		coherentAdministrativeRanges,
 		addressHintRanges,
 		titleHintRanges,
 		recipientLabels,

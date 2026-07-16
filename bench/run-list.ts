@@ -17,7 +17,12 @@ import {
 	parseRecipientList,
 	recipientListBlocks,
 } from "./list-dataset";
-import { addResult, createMetrics, summarize } from "./metrics";
+import {
+	addResult,
+	createMetrics,
+	exactAcceptance,
+	summarize,
+} from "./metrics";
 
 interface ResourceArtifact {
 	readonly resources: ParserResources;
@@ -50,6 +55,9 @@ const outputPath = argument(
 const supplementPath = argument(
 	"--supplement",
 	"bench/fixtures/sakon-messy-v1.jsonl",
+);
+const minimumExactAccuracy = Number(
+	argument("--min-exact-accuracy", "0.95"),
 );
 const input = await Bun.file(inputPath).text();
 const blocks = recipientListBlocks(input);
@@ -151,6 +159,7 @@ const report = {
 		timing: timing(noDirectionsTimes),
 		calibration: summarizeCalibration(noDirectionsCalibration),
 	},
+	acceptance: exactAcceptance(latentMetrics, minimumExactAccuracy),
 	byAddressStyle: Object.fromEntries(
 		[...byStyle.entries()]
 			.sort(([left], [right]) => left.localeCompare(right))
@@ -187,3 +196,8 @@ console.log(
 		2,
 	),
 );
+if (!report.acceptance.passed) {
+	throw new Error(
+		`recipient-list benchmark failed: ${report.acceptance.actualExactRecords}/${records.length} exact records; requires ${report.acceptance.requiredExactRecords}`,
+	);
+}
