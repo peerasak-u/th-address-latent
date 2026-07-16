@@ -58,6 +58,8 @@ bun run bench:list \
   --output .bench-results/recipient-list.json
 ```
 
+`bench/private/` is gitignored; keep private input lists there.
+
 ## Candidate engine
 
 `createAddressParser` compiles resource-derived indexes once. Each parse then
@@ -86,6 +88,18 @@ Resource builds accept:
 Candidate-contrastive fitting uses generated wrong candidates as hard negatives.
 It remains experimental and must beat the matching `noDirections` ablation
 before promotion.
+
+`bun run build:resources` exits non-zero if the built resource loses its
+`noDirections` ablation. Pass `--skip-gate` to write an unpromoted experiment
+artifact anyway. Check that every shipped resource still passes its recorded
+gate (or is explicitly grandfathered with a reason) with:
+
+```bash
+bun run check:resource-gate
+```
+
+CI runs this check before building the library and demo. See
+`docs/adr/0002-resource-promotion-gate.md`.
 
 ## Browser API
 
