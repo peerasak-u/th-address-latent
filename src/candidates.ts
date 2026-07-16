@@ -90,6 +90,8 @@ export function generateCandidates(
 	const seeds = new Map<string, CandidateSeed>();
 	const locationIdsBySeed = new Map<string, Set<number>>();
 	const locationTerms = buildLocationTerms(resources.locations);
+	const addressHintRanges = matches(ADDRESS_HINT, raw);
+	const addressLabels = matches(ADDRESS_LABEL, raw);
 	const provinceHint = [...new Set(
 		locationTerms
 			.filter((term) => term.label === "PROVINCE")
@@ -142,9 +144,18 @@ export function generateCandidates(
 						const firstAdminAfterPhone = administrativeRanges.find((admin) =>
 							phoneRanges.some((phone) => admin.start > phone.end),
 						);
+						const firstAdminAfterAddress = administrativeRanges.find((admin) =>
+							admin.start > start,
+						);
+						const startsInAddressContext =
+							addressHintRanges.some((hint) => start >= hint.start) ||
+							addressLabels.some((label) => start >= label.end);
 						return firstAdminAfterPhone !== undefined &&
 							phoneRanges.some((phone) => start > phone.end) &&
-							start < firstAdminAfterPhone.start;
+							start < firstAdminAfterPhone.start ||
+							(firstAdminAfterAddress !== undefined &&
+								startsInAddressContext &&
+								!administrativeRanges.some((admin) => admin.start <= start));
 					})())
 			) {
 				from = start + Math.max(1, term.surface.length);
@@ -191,7 +202,6 @@ export function generateCandidates(
 	}
 	const recipientLabels = matches(RECIPIENT_LABEL, raw);
 	const phoneLabels = matches(PHONE_LABEL, raw);
-	const addressLabels = matches(ADDRESS_LABEL, raw);
 	const separators = matches(CHAT_SEPARATOR, raw);
 	const excludedBoundaryLabels = [
 		...recipientLabels,

@@ -108,6 +108,27 @@ describe("createAddressParser", () => {
 		});
 	});
 
+	test("keeps road text when an address line has no phone prefix", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "งิ้วด่อน",
+					district: "เมืองสกลนคร",
+					province: "สกลนคร",
+					zipcode: "47000",
+				},
+			],
+		});
+		const raw =
+			"บ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก ต.งิ้วด่อน อ.เมือง จ สกลนคร 47000";
+
+		expect(parser.parse(raw).fields).toMatchObject({
+			address: "บ้านเลขที่ 18/7 หมู่2 ซอยร่วมพัฒนา ถ.สกล-นาแก",
+			district: "เมืองสกลนคร",
+		});
+	});
+
 	test("abstains from an invalid postcode instead of inventing one", () => {
 		const parser = createAddressParser(resources);
 		const result = parser.parse("บ้านเลขที่ 1 ปทุมวัน ปทุมวัน กรุงเทพมหานคร 1033");
