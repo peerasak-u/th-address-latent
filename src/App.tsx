@@ -31,7 +31,7 @@ const fields: ReadonlyArray<{ key: FieldName; label: string }> = [
 const resources = artifact.resources as ParserResources;
 const initialInput: string = examples[0].value;
 
-function confidenceLabel(confidence: number): string {
+function scoreLabel(confidence: number): string {
 	if (confidence >= 0.8) return "มั่นใจสูง";
 	if (confidence >= 0.6) return "มั่นใจปานกลาง";
 	if (confidence > 0) return "มั่นใจต่ำ";
@@ -58,9 +58,9 @@ function ResultPanel({
 					<p className="eyebrow">ผลการแยกข้อมูล</p>
 					<h2>Address record</h2>
 				</div>
-				<div className="confidence" title={`ความมั่นใจ ${confidence}%`}>
+				<div className="confidence" title={`คะแนนการเลือก ${confidence}%`}>
 					<strong>{confidence}%</strong>
-					<span>{confidenceLabel(result.confidence)}</span>
+					<span>{scoreLabel(result.confidence)}</span>
 				</div>
 			</div>
 

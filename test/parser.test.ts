@@ -83,21 +83,25 @@ describe("createAddressParser", () => {
 	});
 
 	test("keeps a title-less person named เมือง separate from the district alias", () => {
-		const parser = createAddressParser({
-			...resources,
-			locations: [
-				{
-					subdistrict: "ธาตุเชิงชุม",
-					district: "เมืองสกลนคร",
-					province: "สกลนคร",
-					zipcode: "47000",
-				},
-			],
-		});
+		const parser = createAddressParser(
+			{
+				...resources,
+				locations: [
+					{
+						subdistrict: "ธาตุเชิงชุม",
+						district: "เมืองสกลนคร",
+						province: "สกลนคร",
+						zipcode: "47000",
+					},
+				],
+			},
+			{ diagnostics: "full" },
+		);
 		const raw =
 			"เมือง ชัยพร\nโทร 0812345678\nบ้านเลขที่ 12 ซอยร่วมใจ ถนนนิตโย ต.ธาตุเชิงชุม อ.เมือง จ.สกลนคร 47000";
 
-		expect(parser.parse(raw).fields).toEqual({
+		const result = parser.parse(raw);
+		expect(result.fields).toEqual({
 			name: "เมือง ชัยพร",
 			phone: "0812345678",
 			address: "บ้านเลขที่ 12 ซอยร่วมใจ ถนนนิตโย",
@@ -106,6 +110,29 @@ describe("createAddressParser", () => {
 			province: "สกลนคร",
 			zipcode: "47000",
 		});
+		expect(result.diagnostics.candidateRejections).toContainEqual({
+			label: "DISTRICT",
+			text: "เมือง",
+			start: 0,
+			end: 5,
+			ruleId: "location.city-unscoped",
+		});
+	});
+
+	test("explains why a title-less first-line recipient was accepted", () => {
+		const parser = createAddressParser(resources, { diagnostics: "full" });
+		const raw =
+			"สมชาย ใจดี\nโทร 0812345678\nบ้านเลขที่ 12 ปทุมวัน ปทุมวัน กรุงเทพมหานคร 10330";
+
+		const result = parser.parse(raw);
+		const acceptedName = result.diagnostics.candidateTrace?.find(
+			(candidate) => candidate.label === "NAME" && candidate.outcome === "accepted",
+		);
+
+		expect(result.fields.name).toBe("สมชาย ใจดี");
+		expect(acceptedName?.evidence.map((item) => item.ruleId)).toContain(
+			"name.titleless-first-line",
+		);
 	});
 
 	test("expands the informal อ.เมือง abbreviation using the province tuple", () => {
@@ -229,5 +256,23 @@ describe("createAddressParser", () => {
 		expect(() =>
 			createAddressParser(resources, { minFieldConfidence: Number.NaN }),
 		).toThrow();
+	});
+
+	test("full diagnostics preserve the validator abstention reason", () => {
+		const parser = createAddressParser(resources, {
+			diagnostics: "full",
+			minFieldConfidence: 1,
+		});
+
+		const result = parser.parse("นายทดสอบ ใจดี");
+
+		expect(
+			result.diagnostics.candidateTrace?.some(
+				(candidate) =>
+					candidate.label === "NAME" &&
+					candidate.outcome === "abstained" &&
+					candidate.reason === "low-confidence",
+			),
+		).toBe(true);
 	});
 });

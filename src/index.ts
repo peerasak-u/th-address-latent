@@ -3,6 +3,9 @@ export { LABELS } from "./types";
 export type {
   Abstention,
   AddressParser,
+	CandidateTrace,
+	CandidateRejection,
+	EvidenceContribution,
   FieldName,
   Label,
   LabelDirection,

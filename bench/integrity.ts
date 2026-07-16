@@ -1,5 +1,15 @@
 import type { DatasetRecord } from "./dataset";
 
+export function contentChecksum(content: string | ArrayBuffer): string {
+	return new Bun.CryptoHasher("sha256").update(content).digest("hex");
+}
+
+export function contentSetChecksum(checksums: readonly string[]): string {
+	return new Bun.CryptoHasher("sha256")
+		.update([...checksums].sort().join("\u0000"))
+		.digest("hex");
+}
+
 export function recordsChecksum(records: readonly DatasetRecord[]): string {
   const payload = records
     .map((record) => ({

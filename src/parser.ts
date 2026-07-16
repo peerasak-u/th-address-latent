@@ -1,8 +1,11 @@
-import { generateCandidates } from "./candidates";
+import { createCandidateEngine } from "./candidates";
 import { validateFeatureConfig, validateScoringConfig } from "./latent/features";
 import { pruneCandidates } from "./decode/pruner";
+import { labelToField } from "./labels";
 import type {
 	AddressParser,
+	Candidate,
+	CandidateTrace,
 	ParseResult,
 	ParserOptions,
 	ParserResources,
@@ -13,7 +16,47 @@ const DEFAULT_OPTIONS: Required<ParserOptions> = {
 	beamWidth: 64,
 	candidatesPerLabel: 24,
 	minFieldConfidence: 0.5,
+	diagnostics: "summary",
 };
+
+function overlaps(left: Candidate, right: Candidate): boolean {
+	return left.start < right.end && right.start < left.end;
+}
+
+function traceCandidates(
+	candidates: readonly Candidate[],
+	selected: readonly Candidate[],
+	result: ParseResult,
+): readonly CandidateTrace[] {
+	const selectedSet = new Set(selected);
+	return candidates.map((candidate): CandidateTrace => {
+		const accepted = result.spans.some((span) =>
+			span.label === candidate.label &&
+			span.start === candidate.start &&
+			span.end === candidate.end &&
+			span.canonical === candidate.canonical
+		);
+		if (accepted) return { ...candidate, outcome: "accepted" };
+		if (selectedSet.has(candidate)) {
+			const abstention = result.abstentions.find(
+				(item) => item.field === labelToField(candidate.label),
+			);
+			return {
+				...candidate,
+				outcome: "abstained",
+				...(abstention ? { reason: abstention.reason } : {}),
+			};
+		}
+		const reason = candidate.score < 0.48
+			? "below-threshold"
+			: selected.some((item) => overlaps(item, candidate))
+				? "overlap"
+				: selected.some((item) => item.label === candidate.label)
+					? "lower-ranked"
+					: "beam-pruned";
+		return { ...candidate, outcome: "pruned", reason };
+	});
+}
 
 function validateOptions(options: Required<ParserOptions>): void {
 	if (!Number.isInteger(options.beamWidth) || options.beamWidth <= 0) {
@@ -58,9 +101,11 @@ export function createAddressParser(
 	validateResources(resources);
 	const resolved = { ...DEFAULT_OPTIONS, ...options };
 	validateOptions(resolved);
+	const candidateEngine = createCandidateEngine(resources);
 	return {
 		parse(raw: string): ParseResult {
-			const candidates = generateCandidates(raw, resources);
+			const generation = candidateEngine.generate(raw);
+			const candidates = generation.candidates;
 			const decoded = pruneCandidates(
 				candidates,
 				resolved.beamWidth,
@@ -74,13 +119,23 @@ export function createAddressParser(
 				candidatesEvaluated: candidates.length,
 				hypothesesEvaluated: decoded.hypothesesEvaluated,
 				latentScoring: "frozen-direction" as const,
+				scoreSemantics: "uncalibrated-selection-score" as const,
 			};
-			return validateDecodeResult(
+			const result = validateDecodeResult(
 				raw,
 				decoded,
 				resolved.minFieldConfidence,
 				diagnostics,
 			);
+			if (resolved.diagnostics !== "full") return result;
+			return {
+				...result,
+				diagnostics: {
+					...result.diagnostics,
+					candidateTrace: traceCandidates(candidates, decoded.selected, result),
+					candidateRejections: generation.rejections,
+				},
+			};
 		},
 	};
 }

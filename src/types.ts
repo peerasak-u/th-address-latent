@@ -58,6 +58,7 @@ export interface ParserOptions {
 	readonly beamWidth?: number;
 	readonly candidatesPerLabel?: number;
 	readonly minFieldConfidence?: number;
+	readonly diagnostics?: "summary" | "full";
 }
 
 export interface ParsedFields {
@@ -82,6 +83,7 @@ export interface ParsedSpan {
 export interface Abstention {
 	readonly field: FieldName;
 	readonly reason:
+		| "invalid-offset"
 		| "low-confidence"
 		| "invalid-format"
 		| "inconsistent-location";
@@ -93,6 +95,42 @@ export interface ParseDiagnostics {
 	readonly candidatesEvaluated: number;
 	readonly hypothesesEvaluated: number;
 	readonly latentScoring: "frozen-direction";
+	readonly scoreSemantics: "uncalibrated-selection-score";
+	readonly candidateTrace?: readonly CandidateTrace[];
+	readonly candidateRejections?: readonly CandidateRejection[];
+}
+
+export interface CandidateRejection {
+	readonly label: OutputLabel;
+	readonly text: string;
+	readonly start: number;
+	readonly end: number;
+	readonly ruleId: string;
+}
+
+export interface EvidenceContribution {
+	readonly ruleId: string;
+	readonly effect: "base" | "add" | "floor" | "reject" | "resolve";
+	readonly value: number;
+}
+
+export interface CandidateTrace {
+	readonly label: OutputLabel;
+	readonly text: string;
+	readonly canonical: string;
+	readonly start: number;
+	readonly end: number;
+	readonly evidenceScore: number;
+	readonly latentScore: number;
+	readonly score: number;
+	readonly evidence: readonly EvidenceContribution[];
+	readonly outcome: "accepted" | "pruned" | "abstained";
+	readonly reason?:
+		| Abstention["reason"]
+		| "below-threshold"
+		| "overlap"
+		| "lower-ranked"
+		| "beam-pruned";
 }
 
 export interface ParseResult {
@@ -118,6 +156,7 @@ export interface Candidate {
 	readonly evidenceScore: number;
 	readonly score: number;
 	readonly locationIds: readonly number[];
+	readonly evidence: readonly EvidenceContribution[];
 }
 
 export interface DecodeResult {

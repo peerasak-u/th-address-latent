@@ -26,10 +26,14 @@ bun run build:resources \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/construction-v1.jsonl \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/name-robust-v1-2040-r1.jsonl \
   --gazetteer ~/Workspace/indie/thai-address-synth-dataset/data/subdistricts.json \
-  --output resources/generated/construction-v2-ngram4-d512.json \
+  --output .bench-results/resources/combined-v3-gold.json \
+  --resource-version combined-v3-gold \
   --seed 20260720 \
   --dimension 512 \
-  --max-character-ngram 4
+  --max-character-ngram 4 \
+  --dataset-balance equal-family \
+  --negative-policy other-spans \
+  --fit-mode gold-centroid
 ```
 
 Run the exploratory head-to-head benchmark:
@@ -42,6 +46,46 @@ bun run bench \
   --legacy ~/Workspace/indie/thai-address-splitter \
   --output .bench-results/construction-v1.json
 ```
+
+Run an aggregate-only benchmark over a structured recipient list. Exact input
+and parsed values are never written to the report; unstructured blocks must
+match the reviewed supplement fixture:
+
+```bash
+bun run bench:list \
+  --input /path/to/private-recipient-list.txt \
+  --resources resources/generated/construction-v2-ngram4-d512.json \
+  --output .bench-results/recipient-list.json
+```
+
+## Candidate engine
+
+`createAddressParser` compiles resource-derived indexes once. Each parse then
+builds immutable context and runs structured, location, and segment candidate
+sources through a seed store, typed evidence rules, scoring, pruning, and final
+validation. See `CONTEXT.md` and `docs/adr/0001-deep-candidate-engine.md` for the
+domain language and decision.
+
+Pass `{ diagnostics: "full" }` to receive candidate evidence, pruning outcomes,
+pre-candidate rejection rules, and exact validation abstention reasons. Full
+diagnostics may contain input text and should not be logged for private data.
+
+The compatibility fields named `confidence` currently contain an uncalibrated
+selection score. Diagnostics report `scoreSemantics: "uncalibrated-selection-score"`.
+
+## Experimental fitting modes
+
+Resource builds accept:
+
+```text
+--dataset-balance uniform-records|equal-family
+--negative-policy output-only|other-spans
+--fit-mode gold-centroid|candidate-contrastive
+```
+
+Candidate-contrastive fitting uses generated wrong candidates as hard negatives.
+It remains experimental and must beat the matching `noDirections` ablation
+before promotion.
 
 ## Browser API
 

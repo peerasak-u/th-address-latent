@@ -4,5 +4,6 @@ demo-dist/
 resources/generated/*
 !resources/generated/*.json
 .bench-results/
+bench/private/
 *.log
 .DS_Store

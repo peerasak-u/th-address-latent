@@ -52,6 +52,37 @@ bun run bench \
 Future changes need a new feature-schema version when feature semantics change.
 Rebuild frozen directions before runtime use.
 
+## Combined v3 fitting experiment
+
+The 801-record construction family and 2,040-record name-robust family were
+split together by complete location tuple: 2,272 training and 569 evaluation
+records. Both v3 builds used equal-family record weighting. The gold-centroid
+build included `OTHER` spans as negatives; the candidate-contrastive build used
+wrong runtime candidates as hard negatives.
+
+| Fitting mode | Exact | NAME | ADDRESS_DETAIL |
+|---|---:|---:|---:|
+| Gold centroid + OTHER negatives | 50.4% | 83.1% | 60.8% |
+| Candidate contrastive | 52.7% | 80.5% | 67.5% |
+| `noDirections` | 58.5% | 77.5% | 76.4% |
+
+Candidate-contrastive fitting is materially better than the new centroid fit,
+but it remains 5.8 percentage points below `noDirections` on exact records.
+Neither v3 resource is promoted.
+
+An aggregate-only 58-record recipient-list benchmark contained 38 structured
+records and 20 blocks already present in the reviewed messy fixture. Results:
+
+| Fitting mode | Exact | NAME | ADDRESS_DETAIL |
+|---|---:|---:|---:|
+| Existing public resource | 58.6% | 96.6% | 67.2% |
+| Gold centroid + OTHER negatives | 37.9% | 96.6% | 44.8% |
+| Candidate contrastive | 53.4% | 98.3% | 60.3% |
+| `noDirections` | 60.3% | 98.3% | 69.0% |
+
+The report stores checksums and aggregate metrics only. No raw recipient,
+phone, address, expected, or parsed values are persisted.
+
 ## Chat dataset boundary-hint experiment
 
 `chat-v2-scale-1500-r1.jsonl` has 1,500 chat-style records. The deterministic
