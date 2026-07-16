@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { createAddressParser, type ParserResources } from "../src";
-import { loadDataset, type ExpectedAddress } from "./dataset";
+import { loadDatasets, type ExpectedAddress } from "./dataset";
 import { recordsChecksum } from "./integrity";
 import { loadLegacyParser } from "./legacy";
 import { addResult, createMetrics, summarize } from "./metrics";
@@ -28,6 +28,14 @@ function argument(name: string, fallback?: string): string {
 	return value;
 }
 
+function argumentsFor(name: string): string[] {
+	const values: string[] = [];
+	for (let index = 0; index < Bun.argv.length; index += 1) {
+		if (Bun.argv[index] === name && Bun.argv[index + 1]) values.push(Bun.argv[index + 1]!);
+	}
+	return values;
+}
+
 function percentile(values: readonly number[], p: number): number {
 	if (values.length === 0) return 0;
 	const sorted = [...values].sort((left, right) => left - right);
@@ -37,7 +45,8 @@ function percentile(values: readonly number[], p: number): number {
 	);
 }
 
-const datasetPath = argument("--dataset");
+const datasetPaths = argumentsFor("--dataset");
+if (datasetPaths.length === 0) throw new Error("missing --dataset");
 const artifactPath = argument(
 	"--resources",
 	"resources/generated/construction-v2-ngram4-d512.json",
@@ -51,7 +60,7 @@ const outputPath = argument(
 	".bench-results/construction-v2-ngram4-d512.json",
 );
 
-const records = await loadDataset(datasetPath);
+const records = await loadDatasets(datasetPaths);
 const artifact = (await Bun.file(artifactPath).json()) as Artifact;
 const evalIds = new Set(artifact.split.evaluationIds);
 const evaluation = records.filter((record) => evalIds.has(record.id));

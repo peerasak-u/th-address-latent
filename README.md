@@ -24,6 +24,7 @@ Build a deterministic local resource artifact:
 ```bash
 bun run build:resources \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/construction-v1.jsonl \
+  --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/name-robust-v1-2040-r1.jsonl \
   --gazetteer ~/Workspace/indie/thai-address-synth-dataset/data/subdistricts.json \
   --output resources/generated/construction-v2-ngram4-d512.json \
   --seed 20260720 \
@@ -36,6 +37,7 @@ Run the exploratory head-to-head benchmark:
 ```bash
 bun run bench \
   --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/construction-v1.jsonl \
+  --dataset ~/Workspace/indie/thai-address-synth-dataset/data/generated/name-robust-v1-2040-r1.jsonl \
   --resources resources/generated/construction-v2-ngram4-d512.json \
   --legacy ~/Workspace/indie/thai-address-splitter \
   --output .bench-results/construction-v1.json

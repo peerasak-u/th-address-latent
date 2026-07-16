@@ -145,5 +145,23 @@ export function parseJsonl(text: string): readonly DatasetRecord[] {
 }
 
 export async function loadDataset(path: string): Promise<readonly DatasetRecord[]> {
-  return parseJsonl(await Bun.file(path).text());
+	return parseJsonl(await Bun.file(path).text());
+}
+
+export async function loadDatasets(
+	paths: readonly string[],
+): Promise<readonly DatasetRecord[]> {
+	if (paths.length === 0) throw new Error("at least one dataset path is required");
+	const records: DatasetRecord[] = [];
+	const ids = new Set<string>();
+	for (const path of paths) {
+		for (const record of await loadDataset(path)) {
+			if (ids.has(record.id)) {
+				throw new Error(`duplicate dataset id across files: ${record.id}`);
+			}
+			ids.add(record.id);
+			records.push(record);
+		}
+	}
+	return records;
 }

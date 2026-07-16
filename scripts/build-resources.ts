@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { loadDataset } from "../bench/dataset";
+import { loadDatasets } from "../bench/dataset";
 import { loadGazetteer } from "../bench/gazetteer";
 import { recordsChecksum } from "../bench/integrity";
 import { splitByLocation } from "../bench/split";
@@ -18,7 +18,16 @@ function argument(name: string, fallback?: string): string {
 	return value;
 }
 
-const datasetPath = argument("--dataset");
+function argumentsFor(name: string): string[] {
+	const values: string[] = [];
+	for (let index = 0; index < Bun.argv.length; index += 1) {
+		if (Bun.argv[index] === name && Bun.argv[index + 1]) values.push(Bun.argv[index + 1]!);
+	}
+	return values;
+}
+
+const datasetPaths = argumentsFor("--dataset");
+if (datasetPaths.length === 0) throw new Error("missing --dataset");
 const gazetteerPath = argument("--gazetteer");
 const outputPath = argument(
 	"--output",
@@ -55,11 +64,15 @@ const scoringConfig = {
 	},
 };
 
-const datasetBytes = await Bun.file(datasetPath).arrayBuffer();
-const datasetChecksum = new Bun.CryptoHasher("sha256")
-	.update(datasetBytes)
-	.digest("hex");
-const records = await loadDataset(datasetPath);
+const datasetChecksumHasher = new Bun.CryptoHasher("sha256");
+for (const datasetPath of datasetPaths) {
+	datasetChecksumHasher.update(datasetPath);
+	datasetChecksumHasher.update("\u0000");
+	datasetChecksumHasher.update(await Bun.file(datasetPath).arrayBuffer());
+	datasetChecksumHasher.update("\u0000");
+}
+const datasetChecksum = datasetChecksumHasher.digest("hex");
+const records = await loadDatasets(datasetPaths);
 const split = splitByLocation(records, splitSeed);
 const locations = await loadGazetteer(gazetteerPath);
 const resourceVersion = argument(
@@ -89,7 +102,7 @@ const artifact = {
 		evaluationIds: split.evaluation.map((record) => record.id),
 	},
 	source: {
-		datasetPath,
+	datasetPaths,
 		gazetteerPath,
 		datasetChecksum,
 		evaluationChecksum: recordsChecksum(split.evaluation),
