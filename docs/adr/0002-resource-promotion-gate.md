@@ -18,7 +18,11 @@ without frozen directions.
 `bun run build:resources` refuses to write a resource that loses its `noDirections`
 ablation and exits non-zero, unless `--skip-gate` is passed to write an explicitly
 unpromoted experiment artifact instead. Every written artifact records a
-`promotionGate` field (`enforced`, `passed`, `failures`, `report`). `bun run
+`promotionGate` field (`enforced`, `passed`, `ablationApplicable`, `failures`,
+`report`). Under `fit-mode=none` the built resource has no frozen directions, so
+it is identical to its own `noDirections` comparison parser and `passed` is
+trivially true; `ablationApplicable: false` marks that case so `passed: true`
+is never misread as a demonstrated win over the baseline. `bun run
 check:resource-gate` (`scripts/check-resource-gate.ts`) scans `src/` and `bench/`
 for `resources/generated/*.json` references and fails CI if any shipped resource
 lacks a `promotionGate`, has `enforced: false`, has `passed: false`, or is marked

@@ -27,6 +27,7 @@ function evaluatePromotionGate(
 	evaluation: readonly DatasetRecord[],
 	familyByRecordId: ReadonlyMap<string, number>,
 	familyIds: readonly string[],
+	ablationApplicable: boolean,
 ) {
 	const latentParser = createAddressParser(resources);
 	const noDirectionsParser = createAddressParser({
@@ -75,11 +76,14 @@ function evaluatePromotionGate(
 			);
 		}
 	}
-	checkSlice("overall", overall);
-	for (const [caseType, slice] of byCaseType) checkSlice(`caseType:${caseType}`, slice);
-	for (const [familyId, slice] of byDatasetFamily) checkSlice(`datasetFamily:${familyId}`, slice);
+	if (ablationApplicable) {
+		checkSlice("overall", overall);
+		for (const [caseType, slice] of byCaseType) checkSlice(`caseType:${caseType}`, slice);
+		for (const [familyId, slice] of byDatasetFamily) checkSlice(`datasetFamily:${familyId}`, slice);
+	}
 	return {
 		passed: failures.length === 0,
+		ablationApplicable,
 		failures,
 		report: {
 			overall: { latent: summarize(overall.latent), noDirections: summarize(overall.noDirections) },
@@ -274,7 +278,13 @@ const gate = evaluatePromotionGate(
 	split.evaluation,
 	familyByRecordId,
 	datasetSources.map((source) => source.id),
+	fitMode !== "none",
 );
+if (!gate.ablationApplicable) {
+	console.warn(
+		"fit-mode=none: promotionGate.passed reflects the deterministic no-directions baseline, not an ablation win.",
+	);
+}
 if (!gate.passed && !skipGate) {
 	console.error("Promotion gate failed: frozen resource lost to noDirections");
 	for (const failure of gate.failures) console.error(`  ${failure}`);
@@ -307,6 +317,7 @@ const artifact = {
 	promotionGate: {
 		enforced: !skipGate,
 		passed: gate.passed,
+		ablationApplicable: gate.ablationApplicable,
 		failures: gate.failures,
 		report: gate.report,
 	},

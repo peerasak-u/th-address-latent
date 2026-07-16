@@ -4,6 +4,7 @@ import { join } from "node:path";
 interface PromotionGate {
 	readonly enforced: boolean;
 	readonly passed: boolean;
+	readonly ablationApplicable?: boolean;
 	readonly failures: readonly string[];
 	readonly grandfathered?: boolean;
 }
@@ -64,6 +65,8 @@ for (const path of shippedResourcePaths) {
 		failures.push(`${path}: promotionGate.enforced is false (built with --skip-gate)`);
 	} else if (!gate.passed) {
 		failures.push(`${path}: promotionGate.passed is false (lost to noDirections)`);
+	} else if (gate.ablationApplicable === false) {
+		console.log(`${path}: fit-mode=none, promotionGate.passed reflects the noDirections baseline itself (no ablation was run)`);
 	}
 }
 
