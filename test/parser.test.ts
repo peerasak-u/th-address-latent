@@ -129,6 +129,32 @@ describe("createAddressParser", () => {
 		});
 	});
 
+	test("recognizes an unprefixed subdistrict and city district before a province", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "ธาตุเชิงชุม",
+					district: "เมืองสกลนคร",
+					province: "สกลนคร",
+					zipcode: "47000",
+				},
+			],
+		});
+		const raw =
+			"คุณอัญชลี คำหอม\n092 778 6315\nอาคารพาณิชย์ 2 ชั้น ห้อง 3, 44/16 ซ.สุขสวัสดิ์ ถ.นิตโย ธาตุเชิงชุม เมือง สกลนคร จ.47000";
+
+		expect(parser.parse(raw).fields).toEqual({
+			name: "คุณอัญชลี คำหอม",
+			phone: "0927786315",
+			address: "อาคารพาณิชย์ 2 ชั้น ห้อง 3, 44/16 ซ.สุขสวัสดิ์ ถ.นิตโย",
+			subdistrict: "ธาตุเชิงชุม",
+			district: "เมืองสกลนคร",
+			province: "สกลนคร",
+			zipcode: "47000",
+		});
+	});
+
 	test("abstains from an invalid postcode instead of inventing one", () => {
 		const parser = createAddressParser(resources);
 		const result = parser.parse("บ้านเลขที่ 1 ปทุมวัน ปทุมวัน กรุงเทพมหานคร 1033");

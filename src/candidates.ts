@@ -127,12 +127,27 @@ export function generateCandidates(
 			const start = raw.indexOf(term.surface, from);
 			if (start < 0) break;
 			const end = start + term.surface.length;
+			const location = resources.locations[term.locationId];
+			const cityStart = raw.indexOf("เมือง", end);
+			const provinceStart = location
+				? raw.indexOf(location.province, cityStart < 0 ? end : cityStart + "เมือง".length)
+				: -1;
+			const hasCityProvinceSequence =
+				location !== undefined &&
+				provinceHint !== undefined &&
+				location.province === provinceHint &&
+				((term.label === "SUBDISTRICT" && cityStart >= end && provinceStart > cityStart) ||
+					(term.label === "DISTRICT" &&
+						term.surface === "เมือง" &&
+						raw.slice(0, start).includes(location.subdistrict) &&
+						provinceStart > start));
+			const isProvinceHint =
+				term.label === "PROVINCE" && term.surface === provinceHint;
 			if (
 				term.label === "DISTRICT" &&
 				term.surface === "เมือง" &&
-				(!/อ\.\s*$/u.test(raw.slice(0, start)) ||
-					provinceHint === undefined ||
-					resources.locations[term.locationId]?.province !== provinceHint)
+				!/อ\.\s*$/u.test(raw.slice(0, start)) &&
+				!hasCityProvinceSequence
 			) {
 				from = start + Math.max(1, term.surface.length);
 				continue;
@@ -152,10 +167,14 @@ export function generateCandidates(
 							addressLabels.some((label) => start >= label.end);
 						return firstAdminAfterPhone !== undefined &&
 							phoneRanges.some((phone) => start > phone.end) &&
-							start < firstAdminAfterPhone.start ||
+							start < firstAdminAfterPhone.start &&
+							!hasCityProvinceSequence &&
+							!isProvinceHint ||
 							(firstAdminAfterAddress !== undefined &&
 								startsInAddressContext &&
-								!administrativeRanges.some((admin) => admin.start <= start));
+								!administrativeRanges.some((admin) => admin.start <= start) &&
+								!hasCityProvinceSequence &&
+								!isProvinceHint);
 					})())
 			) {
 				from = start + Math.max(1, term.surface.length);
