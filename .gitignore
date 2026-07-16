@@ -1,0 +1,8 @@
+node_modules/
+dist/
+demo-dist/
+resources/generated/*
+!resources/generated/*.json
+.bench-results/
+*.log
+.DS_Store

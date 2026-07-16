@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ภาพอธิบายการทำงานของ th-address-latent" />
+    <title>TH Address Latent — อธิบายระบบ</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap");
+
+      :root {
+        --ink: #182033;
+        --muted: #667085;
+        --paper: #f7f5ef;
+        --panel: #fffdf8;
+        --line: #ddd9cf;
+        --accent: #e96744;
+        --dark: #20253b;
+        --green: #4e8b67;
+        --blue: #477fb5;
+        --gold: #bd8530;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--paper);
+        font-family: "Noto Sans Thai", system-ui, sans-serif;
+        line-height: 1.7;
+      }
+      code,
+      .mono {
+        font-family: "DM Mono", monospace;
+      }
+      .page {
+        width: min(1120px, calc(100% - 32px));
+        margin: auto;
+      }
+      .hero {
+        padding: 72px 0 46px;
+        display: grid;
+        grid-template-columns: 1.25fr 0.75fr;
+        gap: 32px;
+        align-items: end;
+      }
+      .brand {
+        color: var(--accent);
+        font:
+          500 12px "DM Mono",
+          monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      h1 {
+        max-width: 760px;
+        margin: 12px 0 16px;
+        font-size: clamp(36px, 6vw, 68px);
+        line-height: 1.08;
+        letter-spacing: -0.055em;
+      }
+      h1 em {
+        color: var(--accent);
+        font-style: normal;
+      }
+      h2 {
+        margin: 0 0 12px;
+        font-size: clamp(25px, 3vw, 34px);
+        line-height: 1.25;
+        letter-spacing: -0.04em;
+      }
+      h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        letter-spacing: -0.025em;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      .lead {
+        max-width: 690px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .hero-note {
+        border-left: 3px solid var(--accent);
+        padding: 8px 0 8px 18px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: rgb(247 245 239 / 0.92);
+        backdrop-filter: blur(10px);
+        border-block: 1px solid var(--line);
+      }
+      .nav-inner {
+        display: flex;
+        gap: 20px;
+        overflow: auto;
+        padding: 11px 0;
+        white-space: nowrap;
+      }
+      .nav a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .nav a:hover {
+        color: var(--accent);
+      }
+      section {
+        padding: 70px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .eyebrow {
+        margin-bottom: 7px;
+        color: var(--accent);
+        font:
+          500 11px "DM Mono",
+          monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      .intro-grid,
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 22px;
+      }
+      .card {
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--panel);
+        box-shadow: 0 14px 40px rgb(35 32 22 / 0.04);
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .callout {
+        border-radius: 14px;
+        padding: 20px 22px;
+        background: #fff0ea;
+        color: #843922;
+      }
+      .callout strong {
+        color: #6e2d1a;
+      }
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        align-items: stretch;
+        margin-top: 28px;
+      }
+      .stage {
+        position: relative;
+        padding: 19px 16px;
+        border-radius: 14px;
+        color: #fff;
+        min-height: 170px;
+      }
+      .stage:nth-child(1) {
+        background: #477fb5;
+      }
+      .stage:nth-child(2) {
+        background: #7c679e;
+      }
+      .stage:nth-child(3) {
+        background: #bd8530;
+      }
+      .stage:nth-child(4) {
+        background: #4e8b67;
+      }
+      .stage:not(:last-child)::after {
+        position: absolute;
+        z-index: 1;
+        right: -15px;
+        top: 50%;
+        width: 20px;
+        height: 20px;
+        content: "";
+        background: inherit;
+        transform: translateY(-50%) rotate(45deg);
+      }
+      .stage .number {
+        opacity: 0.75;
+        font:
+          500 11px "DM Mono",
+          monospace;
+      }
+      .stage h3 {
+        margin-top: 20px;
+        font-size: 18px;
+      }
+      .stage p {
+        font-size: 13px;
+        line-height: 1.55;
+        opacity: 0.94;
+      }
+      .example {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--dark);
+        color: #f9f6ed;
+      }
+      .example-head {
+        padding: 12px 18px;
+        color: #bfc4d3;
+        border-bottom: 1px solid rgb(255 255 255 / 0.12);
+        font:
+          12px "DM Mono",
+          monospace;
+      }
+      .raw {
+        padding: 20px;
+        color: #fff0b8;
+        font-size: 16px;
+        word-break: break-word;
+      }
+      .parsed {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: rgb(255 255 255 / 0.12);
+      }
+      .field {
+        padding: 14px 16px;
+        background: #292f48;
+      }
+      .field small {
+        display: block;
+        color: #9ca6bf;
+        font:
+          10px "DM Mono",
+          monospace;
+      }
+      .field span {
+        font-size: 14px;
+      }
+      .flow {
+        display: grid;
+        gap: 12px;
+        margin-top: 22px;
+      }
+      .flow-row {
+        display: grid;
+        grid-template-columns: 150px 34px 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+      .flow-label {
+        padding: 10px 13px;
+        border-radius: 9px;
+        color: #fff;
+        font:
+          500 12px "DM Mono",
+          monospace;
+        text-align: center;
+      }
+      .flow-label.blue {
+        background: var(--blue);
+      }
+      .flow-label.purple {
+        background: #7c679e;
+      }
+      .flow-label.gold {
+        background: var(--gold);
+      }
+      .flow-label.green {
+        background: var(--green);
+      }
+      .arrow {
+        color: var(--muted);
+        text-align: center;
+        font-size: 22px;
+      }
+      .flow-copy {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .latent-diagram {
+        display: grid;
+        grid-template-columns: 1fr 54px 1.2fr 54px 1fr;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .diagram-box {
+        min-height: 126px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+      }
+      .diagram-box strong {
+        display: block;
+        margin-bottom: 7px;
+      }
+      .diagram-box p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .vector {
+        display: flex;
+        gap: 3px;
+        margin: 12px 0 0;
+      }
+      .vector i {
+        display: block;
+        width: 11px;
+        height: 20px;
+        border-radius: 2px;
+        background: var(--blue);
+      }
+      .vector i:nth-child(2n) {
+        height: 13px;
+        background: var(--accent);
+      }
+      .vector i:nth-child(3n) {
+        height: 26px;
+        background: var(--green);
+      }
+      .big-arrow {
+        color: var(--accent);
+        font-size: 28px;
+        text-align: center;
+      }
+      .score {
+        padding: 12px;
+        border-radius: 10px;
+        background: #e7f3eb;
+        color: #246142;
+        font:
+          500 22px "DM Mono",
+          monospace;
+        text-align: center;
+      }
+      .comparison {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .comparison .card {
+        min-height: 198px;
+      }
+      .comparison h3 {
+        font-size: 16px;
+      }
+      .comparison code {
+        display: block;
+        margin: 13px 0;
+        padding: 8px;
+        border-radius: 7px;
+        background: #f0eee7;
+        color: #454b5a;
+        font-size: 11px;
+      }
+      .details {
+        margin-top: 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+      }
+      details {
+        padding: 16px 18px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 700;
+      }
+      details p,
+      details ul {
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .result-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+      }
+      .result {
+        padding: 19px;
+        border-radius: 13px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+      .result .tag {
+        display: inline-block;
+        margin-bottom: 10px;
+        padding: 3px 7px;
+        border-radius: 5px;
+        color: #fff;
+        background: var(--green);
+        font:
+          10px "DM Mono",
+          monospace;
+      }
+      .result.warn .tag {
+        background: var(--accent);
+      }
+      .result p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .files {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--line);
+        margin-top: 22px;
+      }
+      .file {
+        padding: 15px 17px;
+        background: var(--panel);
+      }
+      .file code {
+        color: var(--accent);
+        font-size: 12px;
+      }
+      .file span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .verdict {
+        padding: 28px;
+        border-radius: 18px;
+        color: #f8f5ed;
+        background: var(--dark);
+      }
+      .verdict h2 {
+        color: #fff;
+      }
+      .verdict p {
+        color: #c6ccda;
+      }
+      .metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 19px;
+      }
+      .metric {
+        min-width: 160px;
+        padding: 13px;
+        border: 1px solid rgb(255 255 255 / 0.14);
+        border-radius: 10px;
+      }
+      .metric b {
+        display: block;
+        color: #fff0b8;
+        font:
+          500 26px "DM Mono",
+          monospace;
+      }
+      .metric span {
+        color: #bfc4d3;
+        font-size: 12px;
+      }
+      footer {
+        padding: 38px 0 56px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      @media (max-width: 760px) {
+        .hero,
+        .intro-grid,
+        .two-col {
+          grid-template-columns: 1fr;
+        }
+        .hero {
+          padding-top: 46px;
+        }
+        .pipeline {
+          grid-template-columns: 1fr;
+        }
+        .stage {
+          min-height: auto;
+        }
+        .stage:not(:last-child)::after {
+          top: auto;
+          bottom: -15px;
+          right: 50%;
+        }
+        .parsed,
+        .comparison,
+        .result-grid,
+        .files {
+          grid-template-columns: 1fr;
+        }
+        .latent-diagram {
+          grid-template-columns: 1fr;
+        }
+        .big-arrow {
+          transform: rotate(90deg);
+        }
+        .flow-row {
+          grid-template-columns: 120px 25px 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="page hero">
+      <div>
+        <div class="brand">TH Address Latent / System explainer</div>
+        <h1>แยกที่อยู่ไทย<br />ด้วย <em>กติกา + ข้อมูลพื้นที่ + คะแนน</em></h1>
+        <p class="lead">
+          เอกสารนี้อธิบายระบบสำหรับคนที่เคยทำ frontend มาก่อน: ไม่ต้องรู้
+          Machine Learning
+          ก็เห็นได้ว่าข้อความหนึ่งบรรทัดเดินทางผ่านระบบอย่างไรจนกลายเป็นข้อมูลที่ใช้ใน
+          UI ได้
+        </p>
+      </div>
+      <aside class="hero-note">
+        <strong>แก่นของระบบ</strong><br />มันไม่ได้ทายคำตอบจาก LLM
+        แต่สร้างตัวเลือกหลายแบบ แล้วเลือกชุดที่เข้ากันที่สุด
+        พร้อมยอมเว้นช่องที่ไม่มั่นใจ
+      </aside>
+    </header>
+
+    <nav class="nav">
+      <div class="page nav-inner">
+        <a href="#overview">ภาพรวม</a><a href="#pipeline">Pipeline</a
+        ><a href="#latent">Latent คืออะไร</a
+        ><a href="#safety">ทำไมต้องตรวจซ้ำ</a><a href="#files">แผนที่ไฟล์</a
+        ><a href="#verdict">สถานะจริง</a>
+      </div>
+    </nav>
+
+    <main class="page">
+      <section id="overview">
+        <p class="eyebrow">01 / problem</p>
+        <h2>จาก string ยาว ๆ สู่ object ที่ frontend ใช้ต่อได้</h2>
+        <div class="example">
+          <div class="example-head">input → parse(raw) → result.fields</div>
+          <div class="raw">
+            นายทดสอบ ใจดี 081-234-5678 บ้านเลขที่ 1 ปทุมวัน ปทุมวัน
+            กรุงเทพมหานคร 10330
+          </div>
+          <div class="parsed">
+            <div class="field">
+              <small>NAME</small><span>นายทดสอบ ใจดี</span>
+            </div>
+            <div class="field"><small>PHONE</small><span>0812345678</span></div>
+            <div class="field">
+              <small>ADDRESS</small><span>บ้านเลขที่ 1</span>
+            </div>
+            <div class="field">
+              <small>SUBDISTRICT</small><span>ปทุมวัน</span>
+            </div>
+            <div class="field"><small>DISTRICT</small><span>ปทุมวัน</span></div>
+            <div class="field">
+              <small>PROVINCE / ZIPCODE</small
+              ><span>กรุงเทพมหานคร / 10330</span>
+            </div>
+          </div>
+        </div>
+        <div class="intro-grid" style="margin-top: 22px">
+          <article class="card">
+            <h3>สิ่งที่ library รับเข้า</h3>
+            <p>
+              ข้อความดิบเพียงก้อนเดียว และ resource JSON ที่เตรียมไว้ล่วงหน้า
+            </p>
+            <code>parser.parse(rawAddress)</code>
+          </article>
+          <article class="card">
+            <h3>สิ่งที่ library ส่งกลับ</h3>
+            <p>
+              fields ที่แยกแล้ว, ตำแหน่งในข้อความ, confidence,
+              และเหตุผลเมื่อเลือกไม่ตอบ
+            </p>
+            <code>ParseResult</code>
+          </article>
+        </div>
+      </section>
+
+      <section id="pipeline">
+        <p class="eyebrow">02 / pipeline</p>
+        <h2>การทำงานจริงมี 4 ด่าน</h2>
+        <p style="color: var(--muted); max-width: 760px">
+          ให้คิดเหมือน form parser ที่ไม่เชื่อคำตอบแรกของตัวเอง: หาให้กว้าง
+          เลือกอย่างมีบริบท แล้วตรวจอย่างเข้มก่อนส่งออก
+        </p>
+        <div class="pipeline">
+          <article class="stage">
+            <div class="number">01</div>
+            <h3>เตรียม resource</h3>
+            <p>
+              ใช้ dataset สร้างเวกเตอร์ และโหลด gazetteer
+              ที่บอกความสัมพันธ์ของตำบล อำเภอ จังหวัด และไปรษณีย์
+            </p>
+          </article>
+          <article class="stage">
+            <div class="number">02</div>
+            <h3>สร้าง candidate</h3>
+            <p>
+              เจอเบอร์โทร จังหวัด หรือช่วงข้อความที่อาจเป็นชื่อ/ที่อยู่
+              แล้วเก็บเป็นตัวเลือกพร้อมคะแนน
+            </p>
+          </article>
+          <article class="stage">
+            <div class="number">03</div>
+            <h3>เลือกชุดคำตอบ</h3>
+            <p>
+              ตัดตัวเลือกที่ทับกัน หรือจับคู่ location ไม่เข้ากัน ด้วย beam
+              search
+            </p>
+          </article>
+          <article class="stage">
+            <div class="number">04</div>
+            <h3>ตรวจผล</h3>
+            <p>
+              normalize format, ตรวจ offset และยอมคืน null
+              เมื่อข้อมูลขัดแย้งหรือมั่นใจต่ำ
+            </p>
+          </article>
+        </div>
+        <div class="flow">
+          <div class="flow-row">
+            <div class="flow-label blue">Candidate generator</div>
+            <div class="arrow">→</div>
+            <div class="flow-copy">
+              Regex หา phone/postcode, lookup จาก gazetteer และ heuristics
+              แบ่งช่วงชื่อหรือรายละเอียดที่อยู่
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-label purple">Latent scoring</div>
+            <div class="arrow">→</div>
+            <div class="flow-copy">
+              ให้คะแนนว่า candidate แต่ละช่วง “หน้าตาคล้าย” label นั้นเพียงใด
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-label gold">Pruner</div>
+            <div class="arrow">→</div>
+            <div class="flow-copy">
+              เลือกชุด candidate ที่คะแนนรวมดีและไม่ชนกัน แทนการเลือก field
+              แบบอิสระ
+            </div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-label green">Validator</div>
+            <div class="arrow">→</div>
+            <div class="flow-copy">
+              ตรวจ format และความสอดคล้องของพื้นที่ก่อนคืน
+              <code>ParseResult</code>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="latent">
+        <p class="eyebrow">03 / latent, without magic</p>
+        <h2>“Latent” ในโปรเจกต์นี้ไม่ใช่ GPT</h2>
+        <div class="callout">
+          <strong>ภาษาคน:</strong>
+          ระบบเรียนรู้รูปทรงของข้อความแต่ละประเภทไว้เป็นไม้บรรทัดหลายอัน
+          แล้วเอาข้อความใหม่มาเทียบว่าคล้ายไม้บรรทัดของ <code>NAME</code>,
+          <code>PHONE</code> หรือ <code>ADDRESS_DETAIL</code> แค่ไหน
+        </div>
+        <div class="latent-diagram">
+          <div class="diagram-box">
+            <strong>ช่วงข้อความ</strong>
+            <p>
+              เช่น <code>นายทดสอบ ใจดี</code><br />มอง n-gram, ความยาว,
+              มีเลขไหม, มีอักษรไทยไหม และบริบทซ้าย/ขวา
+            </p>
+          </div>
+          <div class="big-arrow">→</div>
+          <div class="diagram-box">
+            <strong>Feature vector</strong>
+            <p>
+              แปลงลักษณะเป็นตัวเลขขนาดคงที่ เช่น 256 ช่อง แล้วทำ normalization
+            </p>
+            <div class="vector" aria-label="ตัวอย่าง feature vector">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i
+              ><i></i>
+            </div>
+          </div>
+          <div class="big-arrow">→</div>
+          <div class="diagram-box">
+            <strong>Direction ของ label</strong>
+            <p>
+              เปรียบเทียบกับเวกเตอร์ที่สรุปจากตัวอย่าง label นั้น
+              แล้วแปลงเป็นคะแนน 0–1
+            </p>
+            <div class="score">NAME 0.81</div>
+          </div>
+        </div>
+        <div class="comparison">
+          <article class="card">
+            <h3>สิ่งที่ “มี”</h3>
+            <code
+              >character n-grams<br />feature hashing<br />dot product<br />sigmoid
+              score</code
+            >
+            <p>
+              เป็น linear scoring ที่ deterministic: input และ resource
+              เดิมจะได้คำตอบเดิม
+            </p>
+          </article>
+          <article class="card">
+            <h3>สิ่งที่ “ไม่มีตอนรัน”</h3>
+            <code
+              >no LLM<br />no API call<br />no backpropagation<br />no random
+              sampling</code
+            >
+            <p>browser ไม่ได้ train และไม่ส่งข้อความผู้ใช้ไป server</p>
+          </article>
+          <article class="card">
+            <h3>คะแนนสุดท้าย</h3>
+            <code>0.55 × latent<br />+ 0.45 × evidence</code>
+            <p>
+              หลักฐานแบบ regex หรือ gazetteer ยังมีน้ำหนักมาก จึงเป็น hybrid
+              parser
+            </p>
+          </article>
+        </div>
+        <div class="details">
+          <details>
+            <summary>แล้ว direction ถูกสร้างขึ้นมาอย่างไร?</summary>
+            <p>
+              ตอน build resource ระบบเอา feature เฉลี่ยของตัวอย่าง label หนึ่ง
+              ลบด้วย feature เฉลี่ยของ label อื่น แล้ว normalize ผลลัพธ์เป็น
+              direction ของ label นั้น ดู <code>src/latent/fit.ts</code>
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section id="safety">
+        <p class="eyebrow">04 / choosing safely</p>
+        <h2>ทำไมเลือก candidate ที่คะแนนสูงสุดทีละช่องไม่ได้</h2>
+        <div class="two-col">
+          <article class="card">
+            <h3>ปัญหา: ข้อความหนึ่งช่วงตีความได้หลายแบบ</h3>
+            <p>
+              <code>ปทุมวัน</code> อาจเป็นทั้งตำบลและอำเภอ และข้อมูลแต่ละ field
+              อาจขัดแย้งกันได้ถ้าเลือกแยกคนละรอบ
+            </p>
+            <p>
+              Pruner จึงเลือกเป็น “ชุด” โดยห้ามช่วงข้อความทับกัน
+              และให้โบนัสเมื่อ tuple พื้นที่เข้ากัน
+            </p>
+          </article>
+          <article class="card">
+            <h3>ตัวอย่าง: postcode ขัดกับพื้นที่</h3>
+            <p>
+              ถ้าข้อความมี
+              <code>ปทุมวัน กรุงเทพมหานคร 99999</code> ระบบอาจอ่านรูปแบบ 5
+              หลักได้ แต่ validator เห็นว่าไม่สอดคล้องกับ gazetteer
+            </p>
+            <p>ผลลัพธ์ที่ถูกต้องกว่าคือไม่ใส่ postcode</p>
+          </article>
+        </div>
+        <div class="result-grid" style="margin-top: 22px">
+          <article class="result">
+            <span class="tag">ACCEPT</span>
+            <h3>ข้อมูลมั่นใจและเข้ากัน</h3>
+            <p>
+              คืนค่า canonical เช่นลบขีดจากเบอร์โทร
+              และเก็บตำแหน่งของข้อความไว้ใน <code>spans</code>
+            </p>
+          </article>
+          <article class="result warn">
+            <span class="tag">ABSTAIN</span>
+            <h3>ไม่แน่ใจหรือข้อมูลขัดกัน</h3>
+            <p>
+              คืน <code>null</code> พร้อม reason เช่น
+              <code>low-confidence</code>, <code>invalid-format</code>,
+              <code>inconsistent-location</code>
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="files">
+        <p class="eyebrow">05 / code map</p>
+        <h2>เปิดอ่านโค้ดตามลำดับนี้จะเข้าใจเร็วที่สุด</h2>
+        <div class="files">
+          <div class="file">
+            <code>src/App.tsx</code
+            ><span>React demo: รับ input, เรียก parser, แสดงผล</span>
+          </div>
+          <div class="file">
+            <code>src/parser.ts</code
+            ><span>จุดรวม pipeline และ public API</span>
+          </div>
+          <div class="file">
+            <code>src/candidates.ts</code
+            ><span>หา candidate และรวม evidence score กับ latent score</span>
+          </div>
+          <div class="file">
+            <code>src/decode/pruner.ts</code
+            ><span>beam search เลือกชุด candidate ที่เข้ากัน</span>
+          </div>
+          <div class="file">
+            <code>src/validate/result.ts</code
+            ><span>ตรวจ format, location consistency และสร้างผลลัพธ์</span>
+          </div>
+          <div class="file">
+            <code>src/latent/features.ts</code
+            ><span>ข้อความ → feature vector → คะแนน direction</span>
+          </div>
+          <div class="file">
+            <code>src/latent/fit.ts</code
+            ><span>สร้าง frozen direction จาก labeled dataset</span>
+          </div>
+          <div class="file">
+            <code>scripts/build-resources.ts</code
+            ><span>สร้าง JSON resource ที่ browser import ไปใช้</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="verdict">
+        <p class="eyebrow">06 / current verdict</p>
+        <div class="verdict">
+          <h2>ตอนนี้ latent ยังเป็นส่วนทดลอง</h2>
+          <p>
+            Benchmark ปัจจุบันใช้ข้อมูล synthetic และวัด exact-record accuracy
+            โดยเปรียบเทียบ pipeline เดิมที่เปิด/ปิด frozen direction
+          </p>
+          <div class="metrics">
+            <div class="metric">
+              <b>10.1%</b><span>Hybrid + latent directions</span>
+            </div>
+            <div class="metric">
+              <b>12.7%</b><span>Hybrid ไม่มี directions</span>
+            </div>
+            <div class="metric">
+              <b>1.3%</b><span>Legacy regex parser</span>
+            </div>
+          </div>
+          <p style="margin: 18px 0 0">
+            ดังนั้นสิ่งที่ใช้งานได้ชัดคือโครง parser แบบ hybrid, gazetteer และ
+            validation ส่วน latent direction
+            ยังต้องพิสูจน์ว่าช่วยได้จริงก่อนใช้เป็นค่า default
+          </p>
+        </div>
+      </section>
+    </main>
+    <footer class="page">
+      สร้างจากโค้ดและ README ของ <code>th-address-latent</code> · เปิดไฟล์นี้ใน
+      browser ได้โดยตรง
+    </footer>
+  </body>
+</html>
