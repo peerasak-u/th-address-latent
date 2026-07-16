@@ -9,7 +9,7 @@ Candidate generation had accumulated context scanning, gazetteer matching, `เน€เ
 
 ## Decision
 
-Keep the external parser seam small: `createAddressParser(resources).parse(raw)`. Implement candidate generation as one deep module with internal parse-context, structured-source, location-source, segment-source, evidence-rule, seed-store, and scoring seams.
+Keep the external parser seam small: `createAddressParser(resources).parse(raw)`. Implement candidate generation as one deep module with internal parse-context, structured-source, administrative-source, location-source, recipient-source, segment-source, evidence-rule, seed-store, and scoring seams.
 
 Evidence rules use normal typed functions with explicit IDs, priorities, and bounded effects. We will not create a general-purpose rule DSL. The pruner and validator remain separate modules.
 
