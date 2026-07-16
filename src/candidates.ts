@@ -39,7 +39,7 @@ export function createCandidateEngine(
 			);
 			addSegmentCandidates(context, store);
 			return {
-				candidates: scoreCandidates(raw, resources, store),
+				candidates: scoreCandidates(context, resources, store),
 				rejections: [...rejections.values()],
 			};
 		},

@@ -1,4 +1,8 @@
-import type { EvidenceContribution, OutputLabel } from "../types";
+import type {
+	CandidateSource,
+	EvidenceContribution,
+	OutputLabel,
+} from "../types";
 
 export interface CandidateSeed {
 	readonly label: OutputLabel;
@@ -6,6 +10,7 @@ export interface CandidateSeed {
 	readonly end: number;
 	readonly canonical?: string;
 	readonly evidence: number;
+	readonly source: CandidateSource;
 	readonly evidenceTrace?: readonly EvidenceContribution[];
 	readonly locationId?: number;
 	readonly scopeLocationId?: boolean;
@@ -30,7 +35,7 @@ export class CandidateSeedStore {
 				...previous,
 				evidence: Math.max(previous.evidence, seed.evidence),
 				...(seed.evidence > previous.evidence
-					? { evidenceTrace: seed.evidenceTrace }
+					? { evidenceTrace: seed.evidenceTrace, source: seed.source }
 					: {}),
 				...(previous.locationId === undefined && seed.locationId !== undefined
 					? { locationId: seed.locationId }

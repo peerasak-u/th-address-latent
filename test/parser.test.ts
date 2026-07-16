@@ -323,7 +323,10 @@ describe("createAddressParser", () => {
 		expect(() =>
 			createAddressParser({
 				...resources,
-				scoringConfig: { ...resources.scoringConfig, version: "label-mix-v0" as "label-mix-v1" },
+				scoringConfig: {
+					...resources.scoringConfig,
+					version: "label-mix-v0" as "label-mix-v1",
+				} as ParserResources["scoringConfig"],
 			}),
 		).toThrow("Unsupported latent scoring version");
 	});

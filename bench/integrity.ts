@@ -16,6 +16,7 @@ export function recordsChecksum(records: readonly DatasetRecord[]): string {
       id: record.id,
       raw: record.raw,
       expected: record.expected,
+      normalizationExpected: record.normalizationExpected,
       spans: record.spans,
       seedLocation: record.seedLocation,
     }))

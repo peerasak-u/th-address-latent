@@ -34,15 +34,35 @@ export interface LabelDirection {
 }
 
 export interface LatentFeatureConfig {
-	readonly version: "char-ngram-v2";
+	readonly version: "char-ngram-v2" | "candidate-hash-v3";
 	readonly minCharacterNgram: number;
 	readonly maxCharacterNgram: number;
+	readonly contextWindow?: number;
 }
 
-export interface LatentScoringConfig {
+export interface LegacyLatentScoringConfig {
 	readonly version: "label-mix-v1";
 	readonly latentWeightByLabel: Readonly<Record<OutputLabel, number>>;
 }
+
+export interface ResidualLatentScoringConfig {
+	readonly version: "residual-rank-v2";
+	readonly residualScaleByLabel: Readonly<Record<OutputLabel, number>>;
+	readonly maxAbsoluteResidualLogit: number;
+}
+
+export type LatentScoringConfig =
+	| LegacyLatentScoringConfig
+	| ResidualLatentScoringConfig;
+
+export type CandidateSource =
+	| "recipient"
+	| "structured"
+	| "phone"
+	| "postcode"
+	| "administrative"
+	| "gazetteer"
+	| "segment";
 
 export interface ParserResources {
 	readonly version: string;
@@ -94,7 +114,10 @@ export interface ParseDiagnostics {
 	readonly resourceChecksum?: string;
 	readonly candidatesEvaluated: number;
 	readonly hypothesesEvaluated: number;
-	readonly latentScoring: "frozen-direction";
+	readonly latentScoring:
+		| "frozen-direction"
+		| "sparse-residual"
+		| "evidence-only";
 	readonly scoreSemantics: "uncalibrated-selection-score";
 	readonly candidateTrace?: readonly CandidateTrace[];
 	readonly candidateRejections?: readonly CandidateRejection[];
@@ -123,6 +146,7 @@ export interface CandidateTrace {
 	readonly evidenceScore: number;
 	readonly latentScore: number;
 	readonly score: number;
+	readonly source?: CandidateSource;
 	readonly evidence: readonly EvidenceContribution[];
 	readonly outcome: "accepted" | "pruned" | "abstained";
 	readonly reason?:
@@ -155,6 +179,7 @@ export interface Candidate {
 	readonly latentScore: number;
 	readonly evidenceScore: number;
 	readonly score: number;
+	readonly source?: CandidateSource;
 	readonly locationIds: readonly number[];
 	readonly evidence: readonly EvidenceContribution[];
 }

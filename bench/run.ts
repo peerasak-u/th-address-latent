@@ -59,7 +59,7 @@ const datasetPaths = argumentsFor("--dataset");
 if (datasetPaths.length === 0) throw new Error("missing --dataset");
 const artifactPath = argument(
 	"--resources",
-	"resources/generated/construction-v2-ngram4-d512.json",
+	"resources/generated/construction-v3-residual-name-d2048.json",
 );
 const legacyPath = argument(
 	"--legacy",
@@ -67,7 +67,7 @@ const legacyPath = argument(
 );
 const outputPath = argument(
 	"--output",
-	".bench-results/construction-v2-ngram4-d512.json",
+	".bench-results/combined-v4-residual-name-d2048.json",
 );
 
 const datasetFamilies = await Promise.all(datasetPaths.map(loadDataset));
@@ -170,7 +170,13 @@ for (const record of evaluation) {
 	if (noDirectionsResult) {
 		addCalibration(noDirectionsCalibration, record.expected, noDirectionsResult);
 	}
-	addCandidateFunnel(candidateFunnel, record.expected, diagnosticParser.parse(record.raw));
+	addCandidateFunnel(
+		candidateFunnel,
+		record.expected,
+		diagnosticParser.parse(record.raw),
+		record.spans,
+		record.normalizationExpected,
+	);
 	const slice = byCase.get(record.caseType) ?? {
 		latent: createMetrics(),
 		noDirections: createMetrics(),
@@ -247,7 +253,7 @@ const report = {
 	candidateFunnel: summarizeCandidateFunnel(candidateFunnel),
 	limitations: [
 		"Construction records are synthetic and are not a human-reviewed gold set.",
-		"The split holds out complete location tuples but not generator template families.",
+		"The split excludes cross-partition records and holds out complete location tuples plus generator-declared evaluation template families.",
 		"No production-quality superiority claim is supported by this report.",
 	],
 };

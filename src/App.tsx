@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createAddressParser } from "./parser";
 import type { FieldName, ParseResult, ParserResources } from "./types";
-import artifact from "../resources/generated/construction-v2-ngram4-d512.json";
+import artifact from "../resources/generated/construction-v3-residual-name-d2048.json";
 
 const examples = [
 	{

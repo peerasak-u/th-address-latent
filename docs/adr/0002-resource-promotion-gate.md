@@ -1,4 +1,4 @@
-# ADR-0002: Gate frozen-resource promotion against noDirections
+# ADR-0002: Gate frozen-resource promotion against evidence-only
 
 - Status: Accepted
 - Date: 2026-07-16
@@ -9,18 +9,22 @@ Gold-span centroid fitting and naive dataset concatenation can improve one field
 
 ## Decision
 
-Every frozen-direction experiment must report `noDirections` on the identical candidate, pruning, validation, and split configuration. Reports include candidate reachability, selection, acceptance, dataset-family slices, case-type slices, timing, and accepted-span calibration.
+Every frozen-direction experiment must report an evidence-only ablation on the
+identical Candidate Engine, Pruner, Validator, and partition configuration.
+Reports include candidate reachability, selection, acceptance, dataset-family
+slices, case-type slices, timing, and accepted-span calibration.
 
 Resource construction supports equal-family weighting, `OTHER` negatives, and candidate-contrastive fitting. These are experimental build choices, not automatic runtime promotion.
 It also supports `fit-mode=none`, which produces the deterministic baseline
 without frozen directions.
 
-`bun run build:resources` refuses to write a resource that loses its `noDirections`
-ablation and exits non-zero, unless `--skip-gate` is passed to write an explicitly
-unpromoted experiment artifact instead. Every written artifact records a
+`bun run build:resources` evaluates both development and evaluation partitions
+and refuses to write a resource that loses either evidence-only ablation. It
+exits non-zero unless `--skip-gate` is passed to write an explicitly unpromoted
+experiment artifact instead. Every written artifact records a
 `promotionGate` field (`enforced`, `passed`, `ablationApplicable`, `failures`,
-`report`). Under `fit-mode=none` the built resource has no frozen directions, so
-it is identical to its own `noDirections` comparison parser and `passed` is
+`developmentReport`, `report`). Under `fit-mode=none` the built resource has no
+frozen directions, so it is identical to its own evidence-only comparison and `passed` is
 trivially true; `ablationApplicable: false` marks that case so `passed: true`
 is never misread as a demonstrated win over the baseline. `bun run
 check:resource-gate` (`scripts/check-resource-gate.ts`) scans `src/` and `bench/`
@@ -31,8 +35,9 @@ and demo.
 
 ## Consequences
 
-- A resource that loses to `noDirections` is retained only as an experiment artifact.
-- Location-tuple-held-out evaluation remains the primary synthetic split; template-family and reviewed-gold slices are separate readouts.
+- A resource that loses to evidence-only is retained only as an experiment artifact.
+- Complete location tuples never cross partitions, and generator-declared evaluation template families are held out from fitting and tuning. Incompatible records are explicitly excluded.
+- Development guides bounded tuning; evaluation remains untouched until promotion. The private aggregate list is an additional regression gate.
 - Resource checksums depend on contents and build configuration rather than local absolute paths.
 - The compatibility field named `confidence` is documented as an uncalibrated selection score until a calibrated resource schema is introduced.
 - Pre-gate resources cannot ship; they must be rebuilt and pass the current gate.

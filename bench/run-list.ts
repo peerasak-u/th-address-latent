@@ -46,7 +46,7 @@ function percentile(values: readonly number[], p: number): number {
 const inputPath = argument("--input");
 const resourcePath = argument(
 	"--resources",
-	"resources/generated/construction-v2-ngram4-d512.json",
+	"resources/generated/construction-v3-residual-name-d2048.json",
 );
 const outputPath = argument(
 	"--output",

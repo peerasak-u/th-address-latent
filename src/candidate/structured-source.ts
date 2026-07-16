@@ -23,6 +23,7 @@ export function addStructuredCandidates(
 		store.add({
 			label: "PHONE",
 			...range,
+			source: "phone",
 			canonical,
 			evidence: 0.99,
 			evidenceTrace: [
@@ -41,6 +42,7 @@ export function addStructuredCandidates(
 		const base = {
 			label: "POSTCODE",
 			...range,
+			source: "postcode",
 			canonical,
 			evidence: 0.94,
 			evidenceTrace: [

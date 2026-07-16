@@ -1,5 +1,5 @@
 import type { ParseResult, OutputLabel } from "../src/types";
-import type { ExpectedAddress } from "./dataset";
+import type { DatasetSpan, ExpectedAddress } from "./dataset";
 import { FIELD_NAMES } from "./metrics";
 
 const LABEL_BY_FIELD: Readonly<Record<keyof ExpectedAddress, OutputLabel>> = {
@@ -15,6 +15,7 @@ const LABEL_BY_FIELD: Readonly<Record<keyof ExpectedAddress, OutputLabel>> = {
 interface FunnelField {
 	expected: number;
 	reachable: number;
+	normalizationReachable: number;
 	selected: number;
 	accepted: number;
 }
@@ -31,6 +32,7 @@ export interface CandidateFunnelSummary {
 		keyof ExpectedAddress,
 		FunnelField & {
 			readonly reachability: number;
+			readonly normalizationReachability: number;
 			readonly selectionRate: number;
 			readonly acceptanceRate: number;
 		}
@@ -45,7 +47,13 @@ export function createCandidateFunnel(): CandidateFunnel {
 		fields: Object.fromEntries(
 			FIELD_NAMES.map((field) => [
 				field,
-				{ expected: 0, reachable: 0, selected: 0, accepted: 0 },
+				{
+					expected: 0,
+					reachable: 0,
+					normalizationReachable: 0,
+					selected: 0,
+					accepted: 0,
+				},
 			]),
 		) as CandidateFunnel["fields"],
 		pruneReasons: {},
@@ -62,6 +70,8 @@ export function addCandidateFunnel(
 	funnel: CandidateFunnel,
 	expected: ExpectedAddress,
 	result: ParseResult,
+	goldSpans: readonly DatasetSpan[] = [],
+	normalizationExpected: ExpectedAddress = expected,
 ): void {
 	const trace = result.diagnostics.candidateTrace;
 	if (!trace) throw new Error("candidate funnel requires full diagnostics");
@@ -70,12 +80,37 @@ export function addCandidateFunnel(
 		if (canonical === null) continue;
 		const metric = funnel.fields[field];
 		const label = LABEL_BY_FIELD[field];
-		const matching = trace.filter(
+		const normalizationCanonical = normalizationExpected[field];
+		const normalizationMatching = trace.filter(
 			(candidate) =>
-				candidate.label === label && candidate.canonical === canonical,
+				candidate.label === label &&
+				normalizationCanonical !== null &&
+				candidate.canonical === normalizationCanonical,
 		);
+		const gold = label === "NAME" || label === "ADDRESS_DETAIL"
+			? goldSpans.find((span) => span.label === label)
+			: undefined;
+		let goldStart = gold?.start;
+		let goldEnd = gold?.end;
+		if (goldStart !== undefined && goldEnd !== undefined) {
+			while (goldStart < goldEnd && /\s/u.test(result.raw[goldStart] ?? "")) {
+				goldStart += 1;
+			}
+			while (goldEnd > goldStart && /\s/u.test(result.raw[goldEnd - 1] ?? "")) {
+				goldEnd -= 1;
+			}
+		}
+		const matching = goldStart === undefined || goldEnd === undefined
+			? normalizationMatching
+			: trace.filter(
+					(candidate) =>
+						candidate.label === label &&
+						candidate.start === goldStart &&
+						candidate.end === goldEnd,
+				);
 		metric.expected += 1;
 		if (matching.length > 0) metric.reachable += 1;
+		if (normalizationMatching.length > 0) metric.normalizationReachable += 1;
 		if (
 			matching.some(
 				(candidate) =>
@@ -116,6 +151,10 @@ export function summarizeCandidateFunnel(
 						...value,
 						reachability:
 							value.expected === 0 ? 0 : value.reachable / value.expected,
+						normalizationReachability:
+							value.expected === 0
+								? 0
+								: value.normalizationReachable / value.expected,
 						selectionRate:
 							value.expected === 0 ? 0 : value.selected / value.expected,
 						acceptanceRate:

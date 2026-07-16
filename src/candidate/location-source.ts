@@ -118,6 +118,7 @@ export function addLocationCandidates(
 				label: term.label,
 				start,
 				end,
+				source: "gazetteer",
 				canonical: term.canonical,
 				evidence: 0.96,
 				locationId: term.locationId,

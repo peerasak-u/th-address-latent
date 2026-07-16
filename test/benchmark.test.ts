@@ -68,9 +68,11 @@ test("candidate funnel separates reachability, selection, and acceptance", () =>
 	expect(summarizeCandidateFunnel(funnel).fields.name).toEqual({
 		expected: 1,
 		reachable: 1,
+		normalizationReachable: 1,
 		selected: 1,
 		accepted: 1,
 		reachability: 1,
+		normalizationReachability: 1,
 		selectionRate: 1,
 		acceptanceRate: 1,
 	});

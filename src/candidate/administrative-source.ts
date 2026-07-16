@@ -81,6 +81,7 @@ function addStructuredSuffixes(
 					label,
 					start,
 					end,
+					source: "structured" as const,
 					canonical,
 					evidence: 0.995,
 					evidenceTrace: [
@@ -145,6 +146,7 @@ function addPrefixedValues(
 			label,
 			start,
 			end,
+			source: "administrative" as const,
 			canonical,
 			evidence: 0.98,
 			evidenceTrace: [

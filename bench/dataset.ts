@@ -1,4 +1,10 @@
-import { LABELS, type Label, type LocationTuple } from "../src/types";
+import { normalizeCandidate } from "../src/normalize";
+import {
+	LABELS,
+	type Label,
+	type LocationTuple,
+	type OutputLabel,
+} from "../src/types";
 
 export interface DatasetSpan {
   readonly label: Label;
@@ -27,7 +33,17 @@ export interface DatasetRecord {
   readonly difficulty: string;
   readonly spans: readonly DatasetSpan[];
   readonly expected: ExpectedAddress;
+  readonly normalizationExpected: ExpectedAddress;
   readonly seedLocation: LocationTuple;
+	readonly partition: DatasetPartitionMetadata;
+}
+
+export interface DatasetPartitionMetadata {
+	readonly profile?: string;
+	readonly declaredSplit?: "train" | "evaluation";
+	readonly templateFamily?: string;
+	readonly collisionPairId?: string;
+	readonly recipientCategory?: string;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -55,6 +71,49 @@ function parseLocation(value: unknown): LocationTuple {
 
 function codePointOffset(raw: string, utf16Offset: number): number {
   return Array.from(raw.slice(0, utf16Offset)).length;
+}
+
+function parsePartitionMetadata(value: Record<string, unknown>): DatasetPartitionMetadata {
+	const chat = isObject(value.seedChat) ? value.seedChat : undefined;
+	const collision = chat && isObject(chat.collision) ? chat.collision : undefined;
+	const declaredSplit = chat?.datasetSplit;
+	if (
+		declaredSplit !== undefined &&
+		declaredSplit !== "train" &&
+		declaredSplit !== "evaluation"
+	) {
+		throw new Error("seedChat.datasetSplit must be train or evaluation");
+	}
+	for (const [field, candidate] of [
+		["seedProfile", value.seedProfile],
+		["seedChat.templateFamily", chat?.templateFamily],
+		["seedChat.collision.pairId", collision?.pairId],
+		["seedChat.nameCategory", chat?.nameCategory],
+	] as const) {
+		if (candidate !== undefined && typeof candidate !== "string") {
+			throw new Error(`${field} must be a string`);
+		}
+	}
+	return {
+		...(typeof value.seedProfile === "string" ? { profile: value.seedProfile } : {}),
+		...(declaredSplit === "train" || declaredSplit === "evaluation"
+			? { declaredSplit }
+			: {}),
+		...(typeof chat?.templateFamily === "string"
+			? { templateFamily: chat.templateFamily }
+			: {}),
+		...(typeof collision?.pairId === "string"
+			? { collisionPairId: collision.pairId }
+			: {}),
+		...(typeof chat?.nameCategory === "string"
+			? { recipientCategory: chat.nameCategory }
+			: {}),
+	};
+}
+
+function surfaceCanonical(label: Label, text: string, canonical: string | null): string | null {
+	if (label !== "NAME" && label !== "ADDRESS_DETAIL") return canonical;
+	return normalizeCandidate(label as OutputLabel, text);
 }
 
 function parseRecord(value: unknown, line: number): DatasetRecord {
@@ -94,10 +153,11 @@ function parseRecord(value: unknown, line: number): DatasetRecord {
     ) {
       throw new Error(`line ${line}: invalid offsets in span ${index}`);
     }
+    const label = span.label as Label;
     return {
-      label: span.label as Label,
+      label,
       text: span.text,
-      canonical: span.canonical as string | null,
+      canonical: surfaceCanonical(label, span.text, span.canonical as string | null),
       start,
       end,
       codePointStart,
@@ -105,15 +165,22 @@ function parseRecord(value: unknown, line: number): DatasetRecord {
     };
   });
 
-  const expected = {
-    name: nullableString(value.expected.name, `line ${line}: expected.name`),
+  const sourceExpected = {
+		name: nullableString(value.expected.name, `line ${line}: expected.name`),
     phone: nullableString(value.expected.phone, `line ${line}: expected.phone`),
     address: nullableString(value.expected.address, `line ${line}: expected.address`),
     subdistrict: nullableString(value.expected.subdistrict, `line ${line}: expected.subdistrict`),
     district: nullableString(value.expected.district, `line ${line}: expected.district`),
     province: nullableString(value.expected.province, `line ${line}: expected.province`),
     zipcode: nullableString(value.expected.zipcode, `line ${line}: expected.zipcode`),
-  };
+	};
+	const nameSpan = spans.find((span) => span.label === "NAME");
+	const addressSpan = spans.find((span) => span.label === "ADDRESS_DETAIL");
+	const expected = {
+		...sourceExpected,
+		name: nameSpan ? nameSpan.canonical : sourceExpected.name,
+		address: addressSpan ? addressSpan.canonical : sourceExpected.address,
+	};
   return {
     id: value.id,
     raw,
@@ -121,7 +188,9 @@ function parseRecord(value: unknown, line: number): DatasetRecord {
     difficulty: value.difficulty,
     spans,
     expected,
+    normalizationExpected: sourceExpected,
     seedLocation: parseLocation(value.seedLocation),
+		partition: parsePartitionMetadata(value),
   };
 }
 

@@ -64,9 +64,9 @@ for (const path of shippedResourcePaths) {
 	} else if (!gate.enforced) {
 		failures.push(`${path}: promotionGate.enforced is false (built with --skip-gate)`);
 	} else if (!gate.passed) {
-		failures.push(`${path}: promotionGate.passed is false (lost to noDirections)`);
+		failures.push(`${path}: promotionGate.passed is false (lost to evidence-only)`);
 	} else if (gate.ablationApplicable === false) {
-		console.log(`${path}: fit-mode=none, promotionGate.passed reflects the noDirections baseline itself (no ablation was run)`);
+		console.log(`${path}: fit-mode=none, promotionGate.passed reflects the evidence-only baseline itself (no ablation was run)`);
 	}
 }
 
@@ -74,7 +74,7 @@ if (failures.length > 0) {
 	console.error("Resource promotion gate check failed:");
 	for (const failure of failures) console.error(`  ${failure}`);
 	console.error(
-		"Rebuild the resource with `bun run build:resources` so it passes the noDirections ablation gate before shipping it.",
+		"Rebuild the resource with `bun run build:resources` so it passes the evidence-only ablation gate before shipping it.",
 	);
 	process.exit(1);
 }

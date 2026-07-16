@@ -79,6 +79,7 @@ function addSegmentPair(
 		store.add({
 			label: "NAME",
 			...range,
+			source: "segment",
 			evidence: evidence.name.value,
 			evidenceTrace: evidence.name.contributions,
 		});
@@ -95,6 +96,7 @@ function addSegmentPair(
 		store.add({
 			label: "ADDRESS_DETAIL",
 			...range,
+			source: "segment",
 			evidence: evidence.address.value,
 			evidenceTrace: evidence.address.contributions,
 		});

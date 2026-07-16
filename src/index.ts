@@ -10,6 +10,7 @@ export type {
   Label,
   LabelDirection,
   LatentScoringConfig,
+  LegacyLatentScoringConfig,
   LocationTuple,
   OutputLabel,
   ParseDiagnostics,
@@ -18,4 +19,6 @@ export type {
   ParsedSpan,
   ParserOptions,
   ParserResources,
+  ResidualLatentScoringConfig,
+  CandidateSource,
 } from "./types";

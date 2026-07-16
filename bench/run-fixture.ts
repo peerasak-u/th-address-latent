@@ -18,7 +18,7 @@ function argument(name: string, fallback?: string): string {
 const datasetPath = argument("--dataset", "bench/fixtures/sakon-messy-v1.jsonl");
 const resourcePath = argument(
 	"--resources",
-	"resources/generated/construction-v2-ngram4-d512.json",
+	"resources/generated/construction-v3-residual-name-d2048.json",
 );
 const outputPath = argument(
 	"--output",

@@ -30,6 +30,7 @@ function addLabeledValues(
 		store.add({
 			label: "NAME",
 			...range,
+			source: "recipient",
 			evidence: 0.995,
 			evidenceTrace: [
 				{ ruleId: "name.labeled-value", effect: "base", value: 0.995 },
@@ -51,6 +52,7 @@ function addLabeledValues(
 		store.add({
 			label: "ADDRESS_DETAIL",
 			...range,
+			source: "recipient",
 			evidence: 0.995,
 			evidenceTrace: [
 				{ ruleId: "address.labeled-value", effect: "base", value: 0.995 },
@@ -78,6 +80,7 @@ function addFirstLineRecipient(
 	store.add({
 		label: "NAME",
 		...range,
+		source: "recipient",
 		evidence: 0.97,
 		evidenceTrace: [
 			{ ruleId: "name.titleless-first-line", effect: "base", value: 0.97 },
