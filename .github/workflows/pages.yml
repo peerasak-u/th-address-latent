@@ -30,6 +30,8 @@ jobs:
         run: bun test
       - name: Typecheck
         run: bun run typecheck
+      - name: Check resource promotion gate
+        run: bun run check:resource-gate
       - name: Build library
         run: bun run build
       - name: Build demo
