@@ -265,6 +265,10 @@ export function generateCandidates(
 			const followsRecipientLabel = recipientLabels.some(
 				(label) => raw.slice(label.end, range.start).trim().length === 0,
 			);
+			const isFirstRecipientLine =
+				raw.slice(0, range.start).trim().length === 0 &&
+				phoneRanges.some((phone) => phone.start > range.end) &&
+				!raw.slice(range.start, range.end).includes("\n");
 			const followsAddressLabel = addressLabels.some(
 				(label) => raw.slice(label.end, range.start).trim().length === 0,
 			);
@@ -272,7 +276,7 @@ export function generateCandidates(
 				(text.match(/[ก-๙]/gu)?.length ?? 0) /
 				Math.max(1, Array.from(text).length);
 
-			let nameEvidence = followsRecipientLabel
+			let nameEvidence = followsRecipientLabel || isFirstRecipientLine
 				? 0.96
 				: hasTitle
 					? 0.94

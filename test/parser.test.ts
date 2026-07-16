@@ -82,6 +82,32 @@ describe("createAddressParser", () => {
 		});
 	});
 
+	test("keeps a title-less person named เมือง separate from the district alias", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "ธาตุเชิงชุม",
+					district: "เมืองสกลนคร",
+					province: "สกลนคร",
+					zipcode: "47000",
+				},
+			],
+		});
+		const raw =
+			"เมือง ชัยพร\nโทร 0812345678\nบ้านเลขที่ 12 ซอยร่วมใจ ถนนนิตโย ต.ธาตุเชิงชุม อ.เมือง จ.สกลนคร 47000";
+
+		expect(parser.parse(raw).fields).toEqual({
+			name: "เมือง ชัยพร",
+			phone: "0812345678",
+			address: "บ้านเลขที่ 12 ซอยร่วมใจ ถนนนิตโย",
+			subdistrict: "ธาตุเชิงชุม",
+			district: "เมืองสกลนคร",
+			province: "สกลนคร",
+			zipcode: "47000",
+		});
+	});
+
 	test("expands the informal อ.เมือง abbreviation using the province tuple", () => {
 		const parser = createAddressParser({
 			...resources,
