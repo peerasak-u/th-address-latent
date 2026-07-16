@@ -39,7 +39,7 @@ export const DEFAULT_RESIDUAL_SCORING_CONFIG = {
 	residualScaleByLabel: {
 		NAME: 1,
 		PHONE: 0,
-		ADDRESS_DETAIL: 1,
+		ADDRESS_DETAIL: 0,
 		SUBDISTRICT: 0,
 		DISTRICT: 0,
 		PROVINCE: 0,

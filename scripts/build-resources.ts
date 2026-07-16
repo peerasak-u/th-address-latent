@@ -69,8 +69,10 @@ function evaluatePromotionGate(
 		byDatasetFamily.set(familyId, familySlice);
 	}
 	const failures: string[] = [];
+	let comparisonsRun = 0;
 	function checkSlice(label: string, slice: { latent: ReturnType<typeof createMetrics>; noDirections: ReturnType<typeof createMetrics> }): void {
 		if (slice.latent.records < MIN_SLICE_RECORDS) return;
+		comparisonsRun += 1;
 		const latentAccuracy = slice.latent.records === 0 ? 0 : slice.latent.exactRecords / slice.latent.records;
 		const noDirectionsAccuracy = slice.noDirections.records === 0 ? 0 : slice.noDirections.exactRecords / slice.noDirections.records;
 		if (latentAccuracy < noDirectionsAccuracy) {
@@ -83,6 +85,11 @@ function evaluatePromotionGate(
 		checkSlice("overall", overall);
 		for (const [caseType, slice] of byCaseType) checkSlice(`caseType:${caseType}`, slice);
 		for (const [familyId, slice] of byDatasetFamily) checkSlice(`datasetFamily:${familyId}`, slice);
+		if (comparisonsRun === 0) {
+			failures.push(
+				`no slice reached MIN_SLICE_RECORDS=${MIN_SLICE_RECORDS}; the evidence-only ablation never ran a comparison`,
+			);
+		}
 	}
 	return {
 		passed: failures.length === 0,
@@ -124,10 +131,8 @@ function argumentsFor(name: string): string[] {
 const datasetPaths = argumentsFor("--dataset");
 if (datasetPaths.length === 0) throw new Error("missing --dataset");
 const gazetteerPath = argument("--gazetteer");
-const outputPath = argument(
-	"--output",
-	"resources/generated/construction-v3-residual-name-d2048.json",
-);
+const DEFAULT_OUTPUT_PATH = "resources/generated/construction-v3-residual-name-d2048.json";
+const outputPath = argument("--output", DEFAULT_OUTPUT_PATH);
 const splitSeed = argument("--seed", "20260720");
 const fitMode = argument("--fit-mode", "pairwise-residual");
 if (!["none", "gold-centroid", "candidate-contrastive", "pairwise-residual"].includes(fitMode)) {
@@ -349,6 +354,13 @@ if (!gate.passed && !skipGate) {
 	console.error(
 		"Re-run with --skip-gate to write an unpromoted experiment artifact instead.",
 	);
+	process.exit(1);
+}
+if (!gate.passed && skipGate && outputPath === DEFAULT_OUTPUT_PATH) {
+	console.error(
+		`--skip-gate refuses to overwrite the default shipped resource path (${DEFAULT_OUTPUT_PATH}).`,
+	);
+	console.error("Pass an explicit --output pointing at a non-shipped experiment path.");
 	process.exit(1);
 }
 const artifact = {

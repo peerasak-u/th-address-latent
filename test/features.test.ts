@@ -154,7 +154,13 @@ test("pairwise residual fitting learns offset-matched candidates and preserves e
 		version: "residual-training-test",
 		featureDimension: 256,
 		featureConfig: DEFAULT_CANDIDATE_FEATURE_CONFIG,
-		scoringConfig: DEFAULT_RESIDUAL_SCORING_CONFIG,
+		scoringConfig: {
+			...DEFAULT_RESIDUAL_SCORING_CONFIG,
+			residualScaleByLabel: {
+				...DEFAULT_RESIDUAL_SCORING_CONFIG.residualScaleByLabel,
+				ADDRESS_DETAIL: 1,
+			},
+		},
 		labelDirections: [],
 		locations: [],
 	};

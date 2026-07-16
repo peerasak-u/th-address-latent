@@ -77,8 +77,8 @@ export function buildParseContext(
 ): ParseContext {
 	const phoneRanges = matches(PHONE_PATTERN, raw);
 	const postcodeRanges = matches(POSTCODE_PATTERN, raw);
-	const administrativeRanges = matches(ADMIN_HINT, raw);
-	const coherentAdministrativeRanges = administrativeRanges.filter((range) => {
+	const rawAdministrativeRanges = matches(ADMIN_HINT, raw);
+	const coherentAdministrativeRanges = rawAdministrativeRanges.filter((range) => {
 		const prefix = raw.slice(range.start, range.end).replace(/\s/gu, "");
 		const label = /^(?:แขวง|ตำบล|ต\.)/u.test(prefix)
 			? "SUBDISTRICT"
@@ -98,6 +98,13 @@ export function buildParseContext(
 			(term) =>
 				term.label === label && raw.startsWith(term.surface, range.end),
 		);
+	});
+	const coherentAdministrativeRangeSet = new Set(coherentAdministrativeRanges);
+	const administrativeRanges = rawAdministrativeRanges.filter((range) => {
+		const isBareLetter = /^[ตอจ]$/u.test(
+			raw.slice(range.start, range.end).replace(/\s/gu, ""),
+		);
+		return !isBareLetter || coherentAdministrativeRangeSet.has(range);
 	});
 	const addressHintRanges = matches(ADDRESS_HINT, raw);
 	const titleHintRanges = matches(TITLE_HINT, raw);
@@ -132,7 +139,7 @@ export function buildParseContext(
 			...recipientLabels,
 			...phoneLabels,
 			...addressLabels,
-			...administrativeRanges,
+			...coherentAdministrativeRanges,
 			...separators,
 		],
 		...(provinceHint === undefined ? {} : { provinceHint }),

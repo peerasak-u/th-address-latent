@@ -9,8 +9,16 @@ interface PromotionGate {
 	readonly grandfathered?: boolean;
 }
 
+interface ScoringConfig {
+	readonly version: string;
+	readonly residualScaleByLabel?: Readonly<Record<string, number>>;
+}
+
 interface GeneratedResourceArtifact {
 	readonly promotionGate?: PromotionGate;
+	readonly resources?: {
+		readonly scoringConfig?: ScoringConfig;
+	};
 }
 
 const IMPORT_PATTERN = /resources\/generated\/[\w.-]+\.json/g;
@@ -67,6 +75,16 @@ for (const path of shippedResourcePaths) {
 		failures.push(`${path}: promotionGate.passed is false (lost to evidence-only)`);
 	} else if (gate.ablationApplicable === false) {
 		console.log(`${path}: fit-mode=none, promotionGate.passed reflects the evidence-only baseline itself (no ablation was run)`);
+	}
+	const residualScaleByLabel = artifact.resources?.scoringConfig?.residualScaleByLabel;
+	if (residualScaleByLabel) {
+		for (const [label, scale] of Object.entries(residualScaleByLabel)) {
+			if (label !== "NAME" && scale !== 0) {
+				failures.push(
+					`${path}: residualScaleByLabel.${label} is ${scale}, only NAME may have a nonzero residual scale (ADR-0003)`,
+				);
+			}
+		}
 	}
 }
 
