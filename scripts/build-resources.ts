@@ -7,7 +7,9 @@ import {
 	contentSetChecksum,
 	recordsChecksum,
 } from "../bench/integrity";
+import { addResult, createMetrics, summarize } from "../bench/metrics";
 import { splitByLocation } from "../bench/split";
+import { createAddressParser } from "../src";
 import {
 	DEFAULT_LATENT_FEATURE_CONFIG,
 	DEFAULT_LATENT_SCORING_CONFIG,
@@ -17,6 +19,85 @@ import {
 	fitLabelDirections,
 } from "../src/latent/fit";
 import type { ParserResources } from "../src/types";
+
+const MIN_SLICE_RECORDS = 5;
+
+function evaluatePromotionGate(
+	resources: ParserResources,
+	evaluation: readonly DatasetRecord[],
+	familyByRecordId: ReadonlyMap<string, number>,
+	familyIds: readonly string[],
+) {
+	const latentParser = createAddressParser(resources);
+	const noDirectionsParser = createAddressParser({
+		...resources,
+		labelDirections: [],
+	});
+	const overall = { latent: createMetrics(), noDirections: createMetrics() };
+	const byCaseType = new Map<
+		string,
+		{ latent: ReturnType<typeof createMetrics>; noDirections: ReturnType<typeof createMetrics> }
+	>();
+	const byDatasetFamily = new Map<
+		string,
+		{ latent: ReturnType<typeof createMetrics>; noDirections: ReturnType<typeof createMetrics> }
+	>();
+	for (const record of evaluation) {
+		const latentOutput = latentParser.parse(record.raw).fields;
+		const noDirectionsOutput = noDirectionsParser.parse(record.raw).fields;
+		addResult(overall.latent, record.expected, latentOutput);
+		addResult(overall.noDirections, record.expected, noDirectionsOutput);
+		const caseSlice = byCaseType.get(record.caseType) ?? {
+			latent: createMetrics(),
+			noDirections: createMetrics(),
+		};
+		addResult(caseSlice.latent, record.expected, latentOutput);
+		addResult(caseSlice.noDirections, record.expected, noDirectionsOutput);
+		byCaseType.set(record.caseType, caseSlice);
+		const familyIndex = familyByRecordId.get(record.id);
+		const familyId = familyIndex === undefined ? "unknown" : (familyIds[familyIndex] ?? "unknown");
+		const familySlice = byDatasetFamily.get(familyId) ?? {
+			latent: createMetrics(),
+			noDirections: createMetrics(),
+		};
+		addResult(familySlice.latent, record.expected, latentOutput);
+		addResult(familySlice.noDirections, record.expected, noDirectionsOutput);
+		byDatasetFamily.set(familyId, familySlice);
+	}
+	const failures: string[] = [];
+	function checkSlice(label: string, slice: { latent: ReturnType<typeof createMetrics>; noDirections: ReturnType<typeof createMetrics> }): void {
+		if (slice.latent.records < MIN_SLICE_RECORDS) return;
+		const latentAccuracy = slice.latent.records === 0 ? 0 : slice.latent.exactRecords / slice.latent.records;
+		const noDirectionsAccuracy = slice.noDirections.records === 0 ? 0 : slice.noDirections.exactRecords / slice.noDirections.records;
+		if (latentAccuracy < noDirectionsAccuracy) {
+			failures.push(
+				`${label}: latent exactRecordAccuracy ${latentAccuracy.toFixed(4)} < noDirections ${noDirectionsAccuracy.toFixed(4)}`,
+			);
+		}
+	}
+	checkSlice("overall", overall);
+	for (const [caseType, slice] of byCaseType) checkSlice(`caseType:${caseType}`, slice);
+	for (const [familyId, slice] of byDatasetFamily) checkSlice(`datasetFamily:${familyId}`, slice);
+	return {
+		passed: failures.length === 0,
+		failures,
+		report: {
+			overall: { latent: summarize(overall.latent), noDirections: summarize(overall.noDirections) },
+			byCaseType: Object.fromEntries(
+				[...byCaseType.entries()].map(([key, value]) => [
+					key,
+					{ latent: summarize(value.latent), noDirections: summarize(value.noDirections) },
+				]),
+			),
+			byDatasetFamily: Object.fromEntries(
+				[...byDatasetFamily.entries()].map(([key, value]) => [
+					key,
+					{ latent: summarize(value.latent), noDirections: summarize(value.noDirections) },
+				]),
+			),
+		},
+	};
+}
 
 function argument(name: string, fallback?: string): string {
 	const index = Bun.argv.indexOf(name);
@@ -183,6 +264,21 @@ const resources: ParserResources = {
 	locations,
 	checksum: resourceChecksum,
 };
+const skipGate = Bun.argv.includes("--skip-gate");
+const gate = evaluatePromotionGate(
+	resources,
+	split.evaluation,
+	familyByRecordId,
+	datasetSources.map((source) => source.id),
+);
+if (!gate.passed && !skipGate) {
+	console.error("Promotion gate failed: frozen resource lost to noDirections");
+	for (const failure of gate.failures) console.error(`  ${failure}`);
+	console.error(
+		"Re-run with --skip-gate to write an unpromoted experiment artifact instead.",
+	);
+	process.exit(1);
+}
 const artifact = {
 	resources,
 	split: {
@@ -204,7 +300,18 @@ const artifact = {
 		recordCount: records.length,
 		training: trainingConfig,
 	},
+	promotionGate: {
+		enforced: !skipGate,
+		passed: gate.passed,
+		failures: gate.failures,
+		report: gate.report,
+	},
 };
+if (!gate.passed) {
+	console.warn(
+		"Writing unpromoted experiment artifact (--skip-gate): do not deploy this resource.",
+	);
+}
 await mkdir(dirname(outputPath), { recursive: true });
 await Bun.write(outputPath, `${JSON.stringify(artifact)}\n`);
 console.log(
