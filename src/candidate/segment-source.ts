@@ -91,12 +91,8 @@ function addSegmentPair(
 		...context.phoneLabels,
 		...context.addressLabels,
 		...context.separators,
-		...context.coherentAdministrativeRanges,
 	];
-	if (
-		!anchors.some((anchor) => overlaps(anchor, range)) &&
-		!addressProtectedRanges.some((item) => overlaps(item, range))
-	) {
+	if (!addressProtectedRanges.some((item) => overlaps(item, range))) {
 		store.add({
 			label: "ADDRESS_DETAIL",
 			...range,
