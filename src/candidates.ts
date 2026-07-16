@@ -146,8 +146,11 @@ export function generateCandidates(
 			if (
 				term.label === "DISTRICT" &&
 				term.surface === "เมือง" &&
-				!/อ\.\s*$/u.test(raw.slice(0, start)) &&
-				!hasCityProvinceSequence
+				(!(
+					provinceHint !== undefined &&
+					location?.province === provinceHint &&
+					(/อ\.\s*$/u.test(raw.slice(0, start)) || hasCityProvinceSequence)
+				))
 			) {
 				from = start + Math.max(1, term.surface.length);
 				continue;
