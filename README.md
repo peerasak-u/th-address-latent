@@ -104,15 +104,17 @@ evidence-only score exactly. `none` writes that evidence-only parser.
 
 `bun run build:resources` exits non-zero if the built resource loses its
 evidence-only ablation. Pass `--skip-gate` to write an unpromoted experiment
-artifact anyway. Check that every shipped resource still passes its recorded
-gate with:
+artifact anyway; it still refuses to overwrite the default shipped output path,
+so an unpromoted build must target an explicit `--output`. Check that every
+shipped resource still passes its recorded gate, including that only `NAME`
+may carry a nonzero residual scale, with:
 
 ```bash
 bun run check:resource-gate
 ```
 
-CI runs this check before building the library and demo. See
-`docs/adr/0002-resource-promotion-gate.md`.
+CI runs this check before building the library and demo, on pushes to `main`
+and on pull requests. See `docs/adr/0002-resource-promotion-gate.md`.
 
 ## Browser API
 
