@@ -128,6 +128,15 @@ h2 {
 	background: #7da97b;
 	vertical-align: middle;
 }
+.explainer-link {
+	display: block;
+	margin-top: 12px;
+	color: #e96744;
+	font-family: "Noto Sans Thai", system-ui, sans-serif;
+	font-size: 11px;
+	text-decoration: none;
+}
+.explainer-link:hover { text-decoration: underline; }
 
 .workbench {
 	display: grid;

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="How the Thai address latent parser works." />
+    <title>How Thai Address latent works</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap");
+      :root { color: #171b2c; background: #f7f5ef; font-family: "Noto Sans Thai", system-ui, sans-serif; font-synthesis: none; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; }
+      button, input { font: inherit; }
+      button { cursor: pointer; }
+      a { color: inherit; }
+      .ex-shell { max-width: 1180px; margin: 0 auto; padding: 28px 28px 80px; }
+      .ex-topbar { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+      .ex-brand { display:inline-flex; align-items:center; gap:9px; font:500 13px "DM Mono",monospace; letter-spacing:-.04em; text-decoration:none; }
+      .ex-mark { display:grid; place-items:center; width:27px; height:27px; color:#fff8ef; background:#20253b; border-radius:8px 8px 2px 8px; font:700 17px "Noto Sans Thai",sans-serif; }
+      .ex-brand em { color:#e96744; font-style:normal; }
+      .ex-back { color:#737789; font-size:12px; text-decoration:none; }
+      .ex-back:hover { color:#e96744; }
+      .ex-hero { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:36px; padding:76px 0 62px; border-bottom:1px solid #dedbd1; }
+      .eyebrow { margin:0 0 8px; color:#e96744; font:500 11px "DM Mono",monospace; letter-spacing:.08em; text-transform:uppercase; }
+      h1,h2,h3,p { margin-top:0; }
+      h1 { max-width:800px; margin-bottom:20px; font:700 clamp(40px,7vw,76px)/.98 "Playfair Display","Noto Sans Thai",serif; letter-spacing:-.06em; }
+      .ex-lede { max-width:700px; color:#62687b; font-size:16px; line-height:1.9; }
+      .ex-hero-note { align-self:end; padding:18px; border-left:3px solid #e96744; color:#565b70; background:#fffdf8; font-size:13px; line-height:1.8; }
+      .ex-hero-note strong { display:block; color:#20253b; font-size:15px; }
+      .ex-section { padding:70px 0 0; }
+      .ex-section-head { display:flex; justify-content:space-between; align-items:end; gap:24px; margin-bottom:25px; }
+      h2 { margin-bottom:7px; font-size:28px; letter-spacing:-.05em; }
+      .ex-section-head p { max-width:600px; margin-bottom:0; color:#777b89; font-size:13px; line-height:1.8; }
+      .ex-grid-2 { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+      .ex-card { min-width:0; padding:24px; border:1px solid #e0ded6; border-radius:16px; background:#fffdf8; box-shadow:0 18px 55px rgb(41 37 21 / 4%); }
+      .ex-card.dark { color:#f7f5ef; background:#20253b; border-color:#20253b; }
+      .ex-card h3 { margin-bottom:10px; font-size:18px; }
+      .ex-card p { color:#74798b; font-size:13px; line-height:1.8; }
+      .dark p { color:#b7bac7; }
+      .ex-code { overflow:auto; margin:16px 0 0; padding:15px; border-radius:10px; color:#d9dfd0; background:#171b2c; font:12px/1.8 "DM Mono",monospace; white-space:pre-wrap; }
+      .ex-code .bad { color:#efaf79; } .ex-code .good { color:#b9e0ae; }
+      .ex-pipeline { padding:24px; border:1px solid #dedbd1; border-radius:16px; background:#fffdf8; }
+      .ex-pipeline svg { display:block; width:100%; height:auto; min-height:190px; }
+      .pipe-line { stroke:#c9c5b9; stroke-width:2; stroke-dasharray:5 6; }
+      .pipe-node { cursor:pointer; }
+      .pipe-node rect { fill:#f7f5ef; stroke:#b9b5aa; stroke-width:1.5; transition:all .2s; }
+      .pipe-node.active rect, .pipe-node:hover rect { fill:#fff0e9; stroke:#e96744; stroke-width:2; }
+      .pipe-node text { fill:#20253b; font:600 14px "Noto Sans Thai",sans-serif; pointer-events:none; }
+      .pipe-node .pipe-en { fill:#e96744; font:500 10px "DM Mono",monospace; }
+      .ex-stage { display:grid; grid-template-columns:180px minmax(0,1fr); gap:22px; align-items:start; margin-top:17px; padding:19px; border-radius:12px; color:#f7f5ef; background:#20253b; }
+      .ex-stage-label { color:#efaf79; font:500 11px "DM Mono",monospace; letter-spacing:.06em; text-transform:uppercase; }
+      .ex-stage h3 { margin:3px 0 7px; font-size:18px; }
+      .ex-stage p { margin:0; color:#c3c6d0; font-size:13px; line-height:1.8; }
+      .ex-stage code { color:#b9e0ae; font:12px "DM Mono",monospace; }
+      .ex-ngram { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:16px; }
+      .ex-control { padding:22px; border:1px solid #e0ded6; border-radius:16px; background:#fffdf8; }
+      .ex-control label { display:block; margin-bottom:9px; color:#737789; font-size:12px; }
+      .ex-control input[type=range] { width:100%; accent-color:#e96744; }
+      .ex-n-value { color:#e96744; font:500 20px "DM Mono",monospace; }
+      .ex-token-line { display:flex; flex-wrap:wrap; gap:5px; margin-top:20px; }
+      .ex-token { padding:7px 9px; border:1px solid #dedbd1; border-radius:7px; color:#676c7d; background:#f7f5ef; font:12px "DM Mono",monospace; }
+      .ex-token.hot { color:#fff8ef; border-color:#e96744; background:#e96744; }
+      .ex-formula { display:grid; gap:10px; align-content:center; min-height:100%; padding:26px; border-radius:16px; color:#f7f5ef; background:#20253b; }
+      .ex-formula strong { color:#b9e0ae; font:500 22px "DM Mono",monospace; }
+      .ex-formula p { margin:0; color:#c3c6d0; font-size:13px; line-height:1.8; }
+      .ex-bars { display:grid; gap:13px; margin-top:16px; }
+      .ex-bar-row { display:grid; grid-template-columns:130px minmax(0,1fr) 50px; gap:10px; align-items:center; font-size:12px; }
+      .ex-bar-track { height:10px; overflow:hidden; border-radius:99px; background:#e5e2d9; }
+      .ex-bar-fill { height:100%; border-radius:inherit; background:#e96744; transition:width .2s; }
+      .ex-bar-row:nth-child(2) .ex-bar-fill { background:#7da97b; }
+      .ex-bar-row:nth-child(3) .ex-bar-fill { background:#8f92a2; }
+      .ex-bar-row code { color:#737789; font:11px "DM Mono",monospace; }
+      .ex-latent { display:grid; grid-template-columns:minmax(0,1fr) 250px; gap:17px; }
+      .ex-space { position:relative; min-height:340px; overflow:hidden; border-radius:16px; background:#20253b; }
+      .ex-space::before,.ex-space::after { content:""; position:absolute; background:rgb(255 255 255 / 10%); }
+      .ex-space::before { left:8%; right:8%; top:50%; height:1px; } .ex-space::after { top:8%; bottom:8%; left:50%; width:1px; }
+      .space-label { position:absolute; color:#777b89; font:10px "DM Mono",monospace; }
+      .space-label.x { right:20px; bottom:15px; } .space-label.y { left:15px; top:15px; }
+      .dot { position:absolute; width:13px; height:13px; transform:translate(-50%,-50%); border:2px solid #20253b; border-radius:50%; background:#efaf79; cursor:pointer; transition:transform .2s,box-shadow .2s; }
+      .dot:hover,.dot.selected { z-index:2; transform:translate(-50%,-50%) scale(1.55); box-shadow:0 0 0 7px rgb(233 103 68 / 20%); }
+      .dot.address { background:#7da97b; } .dot.location { background:#efaf79; } .dot.phone { background:#a9a8e2; }
+      .ex-space-info { padding:22px; border:1px solid #e0ded6; border-radius:16px; background:#fffdf8; }
+      .ex-space-info h3 { margin-bottom:9px; font-size:17px; } .ex-space-info p { color:#74798b; font-size:13px; line-height:1.8; }
+      .ex-space-info code { color:#e96744; font:12px "DM Mono",monospace; }
+      .ex-takeaway { display:grid; grid-template-columns:1.2fr .8fr; gap:16px; padding:25px; border-radius:16px; color:#f7f5ef; background:#e96744; }
+      .ex-takeaway h2 { margin-bottom:10px; } .ex-takeaway p { margin-bottom:0; color:#fff2e9; font-size:14px; line-height:1.85; }
+      .ex-takeaway ul { margin:0; padding-left:20px; color:#fff2e9; font-size:13px; line-height:2; }
+      .ex-footer { display:flex; justify-content:space-between; gap:18px; margin-top:60px; padding-top:20px; border-top:1px solid #dedbd1; color:#858998; font:11px "DM Mono",monospace; }
+      @media (max-width:760px) { .ex-shell { padding:20px 17px 55px; } .ex-hero,.ex-grid-2,.ex-ngram,.ex-latent,.ex-takeaway { grid-template-columns:1fr; } .ex-hero { padding:50px 0 40px; } .ex-hero-note { align-self:auto; } .ex-stage { grid-template-columns:1fr; } .ex-pipeline { padding:10px; } .ex-pipeline svg { min-height:260px; } .ex-bar-row { grid-template-columns:105px minmax(0,1fr) 42px; } }
+    </style>
+  </head>
+  <body>
+    <main class="ex-shell">
+      <nav class="ex-topbar">
+        <a class="ex-brand" href="./"><span class="ex-mark">ท</span><span>TH Address <em>latent</em></span></a>
+        <a class="ex-back" href="./">กลับไปที่ playground ↗</a>
+      </nav>
+
+      <header class="ex-hero">
+        <div>
+          <p class="eyebrow">How it works · 05 min read</p>
+          <h1>จาก regex ที่ต้องรู้ทุกคำ<br />สู่แผนที่ของความหมาย</h1>
+          <p class="ex-lede">Thai Address latent ไม่ได้พยายามทายที่อยู่ทั้งก้อนในครั้งเดียว แต่มันสร้างผู้สมัครเล็ก ๆ จากข้อความ แล้วใช้ frozen character n-gram directions, คะแนนหลักฐาน และกฎความสอดคล้องของสถานที่ ค่อย ๆ เลือกคำตอบที่มีเหตุผลที่สุด</p>
+        </div>
+        <aside class="ex-hero-note"><strong>คำถามที่หน้านี้จะตอบ</strong>ทำไมระบบใหม่มี <code>if</code> น้อยลง แต่ยังรักษาความเบาและทำงานใน browser ได้? คำตอบอยู่ที่การย้ายความซับซ้อนจากกฎรายคำ ไปเป็น representation + search + validation</aside>
+      </header>
+
+      <section class="ex-section">
+        <div class="ex-section-head"><div><p class="eyebrow">01 · The shift</p><h2>Legacy กับ latent คิดคนละแบบ</h2></div><p>ของเดิมเป็น pipeline แบบทำความสะอาด → ตัดคำ → match → ลบคำ location → เอาที่เหลือเป็น address ซึ่งตรงไปตรงมาและอ่านง่าย แต่ทุก edge case ใหม่มักกลายเป็น regex หรือ special case ใหม่</p></div>
+        <div class="ex-grid-2">
+          <article class="ex-card"><h3>thai-address-splitter</h3><p>แนวคิดหลักคือรู้จัก pattern ให้มากพอ: prefix, regex, คำ location, และลำดับการลบข้อมูล</p><pre class="ex-code"><span class="bad">clean(text)</span>
+extractThaiWords(text)
+matchLocations(words)
+remove(locationWords)
+extractNamePhone(remaining)
+remaining → address</pre></article>
+          <article class="ex-card dark"><h3>th-address-latent</h3><p>ไม่ต้องบอกทุกคำว่าอยู่ field ไหน แต่ให้หลายคำตอบที่เป็นไปได้ แล้วให้ scorer/pruner/validator ร่วมกันตัดสิน</p><pre class="ex-code"><span class="good">generateCandidates(raw)</span>
+score(evidence, frozenDirection)
+prune(no-overlap, location-coherence)
+validate(or abstain)</pre></article>
+        </div>
+      </section>
+
+      <section class="ex-section">
+        <div class="ex-section-head"><div><p class="eyebrow">02 · The pipeline</p><h2>สามชั้นที่ช่วยกันคิด</h2></div><p>กดแต่ละกล่องเพื่อดูว่า stage นั้นรับผิดชอบอะไร และอะไรที่มัน “ไม่ทำ”</p></div>
+        <div class="ex-pipeline">
+          <svg viewBox="0 0 900 190" role="img" aria-label="Scorer to pruner to validator pipeline">
+            <line class="pipe-line" x1="180" y1="95" x2="350" y2="95" /><line class="pipe-line" x1="550" y1="95" x2="720" y2="95" />
+            <g class="pipe-node active" data-stage="scorer"><rect x="20" y="45" rx="14" width="160" height="100"/><text x="100" y="84" text-anchor="middle">ผู้สมัคร</text><text class="pipe-en" x="100" y="108" text-anchor="middle">CANDIDATES</text><text x="100" y="128" text-anchor="middle">หลายช่วงข้อความ</text></g>
+            <g class="pipe-node" data-stage="scoring"><rect x="350" y="45" rx="14" width="200" height="100"/><text x="450" y="84" text-anchor="middle">Scorer</text><text class="pipe-en" x="450" y="108" text-anchor="middle">EVIDENCE + LATENT</text><text x="450" y="128" text-anchor="middle">ให้คะแนนแต่ละ label</text></g>
+            <g class="pipe-node" data-stage="pruner"><rect x="720" y="45" rx="14" width="160" height="100"/><text x="800" y="84" text-anchor="middle">Pruner</text><text class="pipe-en" x="800" y="108" text-anchor="middle">SEARCH</text><text x="800" y="128" text-anchor="middle">เลือกชุดที่ไม่ชนกัน</text></g>
+          </svg>
+          <div class="ex-stage" id="stage-detail"><div><div class="ex-stage-label">Stage 01</div><h3 id="stage-title">Scorer</h3></div><p id="stage-copy">สร้าง candidate เช่น `บ้านเลขที่ 18/7 ...`, `งิ้วด่อน`, `เมือง` แล้วให้คะแนนจากหลักฐานที่เห็นในข้อความ บวกกับความคล้ายของ frozen direction — ยังไม่เลือกคำตอบสุดท้าย</p></div>
+        </div>
+      </section>
+
+      <section class="ex-section">
+        <div class="ex-section-head"><div><p class="eyebrow">03 · Character n-grams</p><h2>n-gram คือกล้องหลายระยะ</h2></div><p>แทนที่จะต้อง tokenize ภาษาไทยให้ถูกก่อน ระบบมองข้อความเป็นหน้าต่างตัวอักษรหลายขนาด จึงจับคำติดกัน, คำย่อ, punctuation และ typo บางส่วนได้โดยไม่ต้องมี dictionary rule ทุกแบบ</p></div>
+        <div class="ex-ngram">
+          <div class="ex-control"><label for="ngram-range">เลือกขนาด n-gram: <span class="ex-n-value" id="ngram-value">3</span></label><input id="ngram-range" type="range" min="1" max="4" value="3" /><div class="ex-token-line" id="ngram-tokens"></div></div>
+          <div class="ex-formula"><strong>feature = hash("gN:" + window)</strong><p>ทุก window ถูก hash ลง vector ขนาด 512 แล้ว normalize เป็นจุด representation เดียวกัน ทำให้ runtime ใช้แค่ typed array + dot product ไม่มี model server และไม่มี training ตอนใช้งาน</p><p><code>สกลนคร</code> → `ส`, `กล`, `นคร` ... → vector</p></div>
+        </div>
+      </section>
+
+      <section class="ex-section">
+        <div class="ex-section-head"><div><p class="eyebrow">04 · Latent space</p><h2>latent space ไม่ใช่ฐานข้อมูลคำตอบ</h2></div><p>มันคือพื้นที่ตัวเลขที่ทำให้ span ที่มีรูปแบบใกล้กันอยู่ใกล้กันพอให้ทิศทางของ label ช่วยจัดอันดับได้ ส่วนคำตอบ location จริงยังมาจาก gazetteer และ validator</p></div>
+        <div class="ex-latent">
+          <div class="ex-space" id="space"><span class="space-label y">location-like ↑</span><span class="space-label x">address-like →</span></div>
+          <aside class="ex-space-info"><p class="eyebrow">Click a point</p><h3 id="point-title">จุดของ candidate</h3><p id="point-copy">จุดแต่ละจุดคือ span หนึ่งช่วง ไม่ใช่คำศัพท์ที่ระบบจำมาเป็นรายการ คำตอบที่ดีต้องชนะทั้งคะแนนและ constraint อื่น ๆ</p><code id="point-code">label: ADDRESS_DETAIL</code></aside>
+        </div>
+      </section>
+
+      <section class="ex-section">
+        <div class="ex-section-head"><div><p class="eyebrow">05 · Scoring in this resource</p><h2>ทำไม address ใช้ latent weight = 0?</h2></div><p>latent direction เป็น signal เสริม ไม่ใช่ศาสนา ถ้า ablation บอกว่า evidence ตรง ๆ ทำงานดีกว่า ก็ลด weight เฉพาะ label นั้นได้ โดย config ถูก serialize ไปกับ resource</p></div>
+        <div class="ex-grid-2">
+          <div class="ex-card"><label for="address-weight">ADDRESS_DETAIL latent weight: <strong id="weight-value">0.00</strong></label><input id="address-weight" type="range" min="0" max="1" step=".05" value="0" /><div class="ex-bars"><div class="ex-bar-row"><span>address evidence</span><div class="ex-bar-track"><div class="ex-bar-fill" id="evidence-bar" style="width:94%"></div></div><code>0.94</code></div><div class="ex-bar-row"><span>full span score</span><div class="ex-bar-track"><div class="ex-bar-fill" id="full-bar" style="width:94%"></div></div><code id="full-score">0.94</code></div><div class="ex-bar-row"><span>short span score</span><div class="ex-bar-track"><div class="ex-bar-fill" id="short-bar" style="width:94%"></div></div><code id="short-score">0.94</code></div></div></div>
+          <div class="ex-card dark"><h3>สูตรที่ใช้จริง</h3><pre class="ex-code">score = w × latentScore
+      + (1 − w) × evidenceScore
+
+NAME            w = 0.55
+ADDRESS_DETAIL  w = 0.00
+location labels w = 0.55</pre><p>นี่คือเหตุผลที่ระบบยังเบา: direction vector ถูก freeze ไว้ก่อนหน้า และ runtime แค่คำนวณคะแนน + beam search ไม่ได้ train model</p></div>
+        </div>
+      </section>
+
+      <section class="ex-section"><div class="ex-takeaway"><div><p class="eyebrow">The mental model</p><h2>จากกฎรายคำ → การรวมหลักฐาน</h2><p>ระบบใหม่ไม่ได้ลบความรู้เชิงกฎทิ้ง แต่ย้ายมันไปอยู่คนละชั้น: candidate generation ให้โครงสร้าง, latent ให้ soft signal, gazetteer ให้ identity ของ location, pruner ให้ความสัมพันธ์, validator ให้สิทธิ์ในการ abstain</p></div><ul><li>ไม่มี magic model ที่เดาคำตอบทั้งบรรทัด</li><li>ไม่มี runtime training หรือ API</li><li>ถ้า evidence ไม่พอ ระบบเลือกไม่ตอบได้</li><li>ทุกชั้น inspect และ benchmark แยกกันได้</li></ul></div></section>
+      <footer class="ex-footer"><span>TH Address latent · browser-compatible by design</span><span><a href="https://github.com/peerasak-u/thai-address-splitter">legacy regex version</a> · <a href="https://github.com/peerasak-u/th-address-latent">source</a></span></footer>
+    </main>
+    <script>
+      const stageData = {
+        scorer: ["Stage 01", "Scorer", "สร้าง candidate เช่น `บ้านเลขที่ 18/7 ...`, `งิ้วด่อน`, `เมือง` แล้วให้คะแนนจากหลักฐานที่เห็นในข้อความ บวกกับความคล้ายของ frozen direction — ยังไม่เลือกคำตอบสุดท้าย"],
+        scoring: ["Stage 02", "Scorer · latent mix", "รวม evidenceScore กับ latentScore ตามน้ำหนักของ label เช่น NAME = 0.55 แต่ ADDRESS_DETAIL ใน resource ปัจจุบัน = 0 เพื่อไม่ให้ทิศทางรบกวน span ที่ evidence ตรงกว่าชัดเจน"],
+        pruner: ["Stage 03", "Pruner", "ค้นหาชุด candidate ที่ไม่ overlap กัน ให้ bonus เมื่อ subdistrict/district/province/postcode อยู่ใน location tuple เดียวกัน และลงโทษชุดที่ขัดกัน — ยังไม่ใช่ validator"],
+      };
+      document.querySelectorAll(".pipe-node").forEach((node) => node.addEventListener("click", () => { document.querySelectorAll(".pipe-node").forEach((item) => item.classList.remove("active")); node.classList.add("active"); const data = stageData[node.dataset.stage]; document.querySelector("#stage-detail .ex-stage-label").textContent = data[0]; document.querySelector("#stage-title").textContent = data[1]; document.querySelector("#stage-copy").textContent = data[2]; }));
+      const sample = Array.from("สกลนคร");
+      const range = document.querySelector("#ngram-range");
+      function renderNgrams() { const n = Number(range.value); document.querySelector("#ngram-value").textContent = n; const tokens = []; for (let i = 0; i <= sample.length - n; i++) tokens.push(sample.slice(i, i+n).join("")); document.querySelector("#ngram-tokens").innerHTML = tokens.map((token, i) => `<span class="ex-token ${i === 2 ? "hot" : ""}">${token}</span>`).join(""); }
+      range.addEventListener("input", renderNgrams); renderNgrams();
+      const points = [{x:23,y:67,c:"address",title:"บ้านเลขที่ 18/7 ...",copy:"หลักฐาน address สูง เพราะมีเลขที่และคำอย่าง หมู่/ซอย/ถนน",code:"ADDRESS_DETAIL · evidence 0.94"},{x:39,y:52,c:"address",title:"ถ.นิตโย",copy:"ถนนสั้น ๆ อาจเป็น candidate ได้ แต่ต้องไม่ชนกับ address span ใหญ่",code:"ADDRESS_DETAIL · candidate"},{x:69,y:29,c:"location",title:"ธาตุเชิงชุม",copy:"location term จาก gazetteer จึงมี locationIds สำหรับ tuple coherence",code:"SUBDISTRICT · locationIds"},{x:76,y:18,c:"location",title:"เมือง",copy:"alias ที่ resolve เป็น เมืองสกลนคร เมื่อมี province hint สกลนคร",code:"DISTRICT · alias"},{x:61,y:72,c:"phone",title:"089-123-4567",copy:"numeric shape + phone regex ทำให้ evidence สูงมาก",code:"PHONE · normalized"},{x:87,y:55,c:"location",title:"47000",copy:"postcode เป็น anchor และช่วยกรอง location tuple",code:"POSTCODE · exact"}];
+      const space = document.querySelector("#space"); points.forEach((point, i) => { const dot = document.createElement("button"); dot.className = `dot ${point.c}`; dot.style.left = `${point.x}%`; dot.style.top = `${point.y}%`; dot.title = point.title; dot.setAttribute("aria-label", point.title); dot.addEventListener("click", () => { document.querySelectorAll(".dot").forEach(x => x.classList.remove("selected")); dot.classList.add("selected"); document.querySelector("#point-title").textContent = point.title; document.querySelector("#point-copy").textContent = point.copy; document.querySelector("#point-code").textContent = point.code; }); space.appendChild(dot); });
+      const weight = document.querySelector("#address-weight");
+      function renderWeight() { const w = Number(weight.value); const latent = .57; const full = w * latent + (1-w) * .94; const short = w * .84 + (1-w) * .94; document.querySelector("#weight-value").textContent = w.toFixed(2); document.querySelector("#full-score").textContent = full.toFixed(2); document.querySelector("#short-score").textContent = short.toFixed(2); document.querySelector("#full-bar").style.width = `${full*100}%`; document.querySelector("#short-bar").style.width = `${short*100}%`; }
+      weight.addEventListener("input", renderWeight); renderWeight();
+    </script>
+  </body>
+</html>

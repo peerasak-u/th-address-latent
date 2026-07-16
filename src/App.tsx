@@ -139,6 +139,7 @@ export function App() {
 				<div className="resource-note">
 					<span className="resource-dot" />
 					Frozen resource <strong>{resources.version}</strong>
+					<a className="explainer-link" href="explainer.html">How it works ↗</a>
 				</div>
 			</header>
 
