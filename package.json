@@ -13,7 +13,8 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target browser --format esm",
     "build:demo": "vite build",
     "build:resources": "bun run scripts/build-resources.ts",
-    "bench": "bun run bench/run.ts"
+    "bench": "bun run bench/run.ts",
+    "bench:fixture": "bun run bench/run-fixture.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
