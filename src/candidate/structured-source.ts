@@ -1,5 +1,6 @@
+import type { FuzzyLocationIndex } from "../location-index";
 import { normalizeCandidate } from "../normalize";
-import type { LocationTuple } from "../types";
+import type { CandidateRejection, LocationTuple } from "../types";
 import { addAdministrativeValueCandidates } from "./administrative-source";
 import type { ParseContext } from "./context";
 import { overlaps } from "./context";
@@ -9,10 +10,12 @@ import type { CandidateSeed, CandidateSeedStore } from "./seed-store";
 export function addStructuredCandidates(
 	context: ParseContext,
 	locations: readonly LocationTuple[],
+	fuzzyIndex: FuzzyLocationIndex,
 	store: CandidateSeedStore,
+	reject: (rejection: CandidateRejection) => void,
 ): void {
 	addRecipientCandidates(context, store);
-	addAdministrativeValueCandidates(context, locations, store);
+	addAdministrativeValueCandidates(context, locations, fuzzyIndex, store, reject);
 
 	for (const range of context.phoneRanges) {
 		const canonical = normalizeCandidate(

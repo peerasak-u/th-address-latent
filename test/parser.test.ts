@@ -356,3 +356,116 @@ describe("createAddressParser", () => {
 		).toBe(true);
 	});
 });
+
+describe("createAddressParser fuzzy location recovery", () => {
+	test("resolves a misspelled province to its correct canonical spelling", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "ศรีภูมิ",
+					district: "เมืองเชียงใหม่",
+					province: "เชียงใหม่",
+					zipcode: "50200",
+				},
+			],
+		});
+		const raw =
+			"คุณสมชาย ใจดี\n0812345678\nบ้านเลขที่ 1 ต.ศรีภูมิ อ.เมืองเชียงใหม่ จ.เชียงใหม 50200";
+
+		expect(parser.parse(raw).fields).toMatchObject({
+			subdistrict: "ศรีภูมิ",
+			district: "เมืองเชียงใหม่",
+			province: "เชียงใหม่",
+			zipcode: "50200",
+		});
+	});
+
+	test("resolves a misspelled district after อ. using the province-scoped index", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "สันทรายหลวง",
+					district: "สันทราย",
+					province: "เชียงใหม่",
+					zipcode: "50210",
+				},
+			],
+		});
+		const raw =
+			"คุณอารีย์ พรมมา\n0898887777\nบ้านเลขที่ 9 ต.สันทรายหลวง อ.สันทาย จ.เชียงใหม่ 50210";
+
+		expect(parser.parse(raw).fields).toMatchObject({
+			subdistrict: "สันทรายหลวง",
+			district: "สันทราย",
+			province: "เชียงใหม่",
+			zipcode: "50210",
+		});
+	});
+
+	test("resolves a misspelled subdistrict after ต. using the province-scoped index", () => {
+		const parser = createAddressParser({
+			...resources,
+			locations: [
+				{
+					subdistrict: "ศรีภูมิ",
+					district: "เมืองเชียงใหม่",
+					province: "เชียงใหม่",
+					zipcode: "50200",
+				},
+			],
+		});
+		const raw =
+			"คุณดารุณี ทองดี\n0865554444\nบ้านเลขที่ 5 ต.ศรีพูมิ อ.เมืองเชียงใหม่ จ.เชียงใหม่ 50200";
+
+		expect(parser.parse(raw).fields).toMatchObject({
+			subdistrict: "ศรีภูมิ",
+			district: "เมืองเชียงใหม่",
+			province: "เชียงใหม่",
+			zipcode: "50200",
+		});
+	});
+
+	test("abstains instead of hallucinating a subdistrict from unrelated text after ต.", () => {
+		const parser = createAddressParser(resources, {
+			diagnostics: "full",
+			minFieldConfidence: 0.9,
+		});
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.กระรอกน้อยเล่นซน เขตปทุมวัน กรุงเทพมหานคร 10330";
+
+		const result = parser.parse(raw);
+
+		expect(result.fields.subdistrict).toBeNull();
+		expect(result.abstentions).toContainEqual({
+			field: "subdistrict",
+			reason: "low-confidence",
+		});
+		expect(result.diagnostics.candidateRejections).toContainEqual({
+			label: "SUBDISTRICT",
+			text: "กระรอกน้อยเล่นซน",
+			start: 40,
+			end: 56,
+			ruleId: "location.fuzzy-no-match",
+		});
+	});
+
+	test("keeps the raw unmatched text rather than snapping to a wrong existing subdistrict", () => {
+		const parser = createAddressParser(resources, { diagnostics: "full" });
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.กระรอกน้อยเล่นซน เขตปทุมวัน กรุงเทพมหานคร 10330";
+
+		const result = parser.parse(raw);
+
+		expect(result.fields.subdistrict).toBe("กระรอกน้อยเล่นซน");
+		expect(result.fields.subdistrict).not.toBe("ปทุมวัน");
+		expect(result.diagnostics.candidateRejections).toContainEqual({
+			label: "SUBDISTRICT",
+			text: "กระรอกน้อยเล่นซน",
+			start: 40,
+			end: 56,
+			ruleId: "location.fuzzy-no-match",
+		});
+	});
+});

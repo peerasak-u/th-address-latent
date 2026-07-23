@@ -1,4 +1,5 @@
 import type { LocationTerm } from "../location-index";
+import type { OutputLabel } from "../types";
 
 export interface SpanRange {
 	readonly start: number;
@@ -67,6 +68,18 @@ export function containsAddressWord(text: string): boolean {
 	return ADDRESS_WORD.test(text);
 }
 
+export function administrativeLabelForPrefix(
+	prefix: string,
+): Extract<OutputLabel, "SUBDISTRICT" | "DISTRICT" | "PROVINCE"> | null {
+	if (/^(?:แขวง|ตำบล|ต\.)/u.test(prefix)) return "SUBDISTRICT";
+	if (/^(?:เขต|อำเภอ|อ\.)/u.test(prefix)) return "DISTRICT";
+	if (/^(?:จังหวัด|จ\.)/u.test(prefix)) return "PROVINCE";
+	if (prefix === "ต") return "SUBDISTRICT";
+	if (prefix === "อ") return "DISTRICT";
+	if (prefix === "จ") return "PROVINCE";
+	return null;
+}
+
 export function startsWithTitle(text: string): boolean {
 	return TITLE_WORD.test(text);
 }
@@ -80,19 +93,7 @@ export function buildParseContext(
 	const administrativeRanges = matches(ADMIN_HINT, raw);
 	const coherentAdministrativeRanges = administrativeRanges.filter((range) => {
 		const prefix = raw.slice(range.start, range.end).replace(/\s/gu, "");
-		const label = /^(?:แขวง|ตำบล|ต\.)/u.test(prefix)
-			? "SUBDISTRICT"
-			: /^(?:เขต|อำเภอ|อ\.)/u.test(prefix)
-				? "DISTRICT"
-				: /^(?:จังหวัด|จ\.)/u.test(prefix)
-					? "PROVINCE"
-					: prefix === "ต"
-						? "SUBDISTRICT"
-						: prefix === "อ"
-							? "DISTRICT"
-							: prefix === "จ"
-								? "PROVINCE"
-								: null;
+		const label = administrativeLabelForPrefix(prefix);
 		if (!label) return false;
 		return locationTerms.some(
 			(term) =>

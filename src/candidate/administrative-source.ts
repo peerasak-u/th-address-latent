@@ -1,6 +1,11 @@
-import type { LocationTuple, OutputLabel } from "../types";
+import type { FuzzyLocationIndex } from "../location-index";
+import type { CandidateRejection, LocationTuple, OutputLabel } from "../types";
 import type { ParseContext } from "./context";
+import { bestFuzzyMatch } from "./fuzzy-match";
 import type { CandidateSeed, CandidateSeedStore } from "./seed-store";
+
+/** Below this normalized-Levenshtein similarity, a prefixed value is not a plausible typo of a known location. */
+const MIN_FUZZY_SIMILARITY = 80;
 
 interface StructuredValues {
 	readonly subdistrict: string | undefined;
@@ -130,7 +135,9 @@ function locationField(
 function addPrefixedValues(
 	context: ParseContext,
 	locations: readonly LocationTuple[],
+	fuzzyIndex: FuzzyLocationIndex,
 	store: CandidateSeedStore,
+	reject: (rejection: CandidateRejection) => void,
 ): void {
 	for (const prefix of context.administrativeRanges) {
 		const label = prefixedLabel(
@@ -161,16 +168,56 @@ function addPrefixedValues(
 		const locationIds = locations.flatMap((location, locationId) =>
 			location[field] === canonical ? [locationId] : [],
 		);
-		if (locationIds.length === 0) store.add(base);
-		for (const locationId of locationIds) store.add({ ...base, locationId });
+		if (locationIds.length > 0) {
+			for (const locationId of locationIds) store.add({ ...base, locationId });
+			continue;
+		}
+		const scoped =
+			context.provinceHint !== undefined && label !== "PROVINCE"
+				? fuzzyIndex.byLabelAndProvince.get(`${label} ${context.provinceHint}`)
+				: undefined;
+		// Unscoped SUBDISTRICT fuzzy search would scan the entire nationwide
+		// subdistrict list (thousands of terms) on every unresolved marker;
+		// require a province hint to keep it both cheap and unambiguous.
+		const options =
+			scoped ?? (label === "SUBDISTRICT" ? [] : (fuzzyIndex.byLabel.get(label) ?? []));
+		const fuzzy = bestFuzzyMatch(
+			canonical,
+			options.map((term) => ({ text: term.surface, term })),
+			MIN_FUZZY_SIMILARITY,
+		);
+		if (!fuzzy) {
+			if (options.length > 0) {
+				reject({ label, text: canonical, start, end, ruleId: "location.fuzzy-no-match" });
+			}
+			store.add(base);
+			continue;
+		}
+		const evidence = Math.min(
+			0.85,
+			0.5 +
+				((fuzzy.similarity - MIN_FUZZY_SIMILARITY) / (100 - MIN_FUZZY_SIMILARITY)) *
+					0.35,
+		);
+		store.add({
+			...base,
+			canonical: fuzzy.option.term.canonical,
+			locationId: fuzzy.option.term.locationId,
+			evidence,
+			evidenceTrace: [
+				{ ruleId: "location.fuzzy-prefixed-value", effect: "base", value: evidence },
+			],
+		});
 	}
 }
 
 export function addAdministrativeValueCandidates(
 	context: ParseContext,
 	locations: readonly LocationTuple[],
+	fuzzyIndex: FuzzyLocationIndex,
 	store: CandidateSeedStore,
+	reject: (rejection: CandidateRejection) => void,
 ): void {
 	addStructuredSuffixes(context, locations, store);
-	addPrefixedValues(context, locations, store);
+	addPrefixedValues(context, locations, fuzzyIndex, store, reject);
 }

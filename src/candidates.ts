@@ -4,7 +4,7 @@ import { scoreCandidates } from "./candidate/score";
 import { CandidateSeedStore } from "./candidate/seed-store";
 import { addSegmentCandidates } from "./candidate/segment-source";
 import { addStructuredCandidates } from "./candidate/structured-source";
-import { buildLocationTerms } from "./location-index";
+import { buildFuzzyLocationIndex, buildLocationTerms } from "./location-index";
 import type { Candidate, CandidateRejection, ParserResources } from "./types";
 
 export interface CandidateGenerationResult {
@@ -20,6 +20,10 @@ export function createCandidateEngine(
 	resources: ParserResources,
 ): CandidateEngine {
 	const locationTerms = buildLocationTerms(resources.locations);
+	const fuzzyLocationIndex = buildFuzzyLocationIndex(
+		locationTerms,
+		resources.locations,
+	);
 	return {
 		generate(raw: string): CandidateGenerationResult {
 			const context = buildParseContext(raw, locationTerms);
@@ -29,7 +33,13 @@ export function createCandidateEngine(
 				const key = `${rejection.label}\u0000${rejection.start}\u0000${rejection.end}\u0000${rejection.ruleId}`;
 				rejections.set(key, rejection);
 			};
-			addStructuredCandidates(context, resources.locations, store);
+			addStructuredCandidates(
+				context,
+				resources.locations,
+				fuzzyLocationIndex,
+				store,
+				reject,
+			);
 			addLocationCandidates(
 				context,
 				locationTerms,
