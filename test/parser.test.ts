@@ -246,8 +246,26 @@ describe("createAddressParser", () => {
 		expect(parser.parse(raw).fields.address).toBe("บ้านเลขที่ 1 ถนนจันทน์");
 	});
 
-	test("keeps an explicitly prefixed subdistrict absent from the gazetteer", () => {
+	test("abstains an explicitly prefixed subdistrict absent from the gazetteer by default", () => {
 		const parser = createAddressParser(resources);
+		const raw =
+			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.บางใหม่ เขตปทุมวัน กรุงเทพมหานคร 10330";
+
+		const result = parser.parse(raw);
+		expect(result.fields).toMatchObject({
+			subdistrict: null,
+			district: "ปทุมวัน",
+			province: "กรุงเทพมหานคร",
+			zipcode: "10330",
+		});
+		expect(result.abstentions).toContainEqual({
+			field: "subdistrict",
+			reason: "low-confidence",
+		});
+	});
+
+	test("surfaces a gazetteer-absent subdistrict when a caller deliberately lowers minFieldConfidence", () => {
+		const parser = createAddressParser(resources, { minFieldConfidence: 0.2 });
 		const raw =
 			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.บางใหม่ เขตปทุมวัน กรุงเทพมหานคร 10330";
 
@@ -427,11 +445,8 @@ describe("createAddressParser fuzzy location recovery", () => {
 		});
 	});
 
-	test("abstains instead of hallucinating a subdistrict from unrelated text after ต.", () => {
-		const parser = createAddressParser(resources, {
-			diagnostics: "full",
-			minFieldConfidence: 0.9,
-		});
+	test("abstains instead of hallucinating a subdistrict from unrelated text after ต., with default options", () => {
+		const parser = createAddressParser(resources, { diagnostics: "full" });
 		const raw =
 			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.กระรอกน้อยเล่นซน เขตปทุมวัน กรุงเทพมหานคร 10330";
 
@@ -451,8 +466,11 @@ describe("createAddressParser fuzzy location recovery", () => {
 		});
 	});
 
-	test("keeps the raw unmatched text rather than snapping to a wrong existing subdistrict", () => {
-		const parser = createAddressParser(resources, { diagnostics: "full" });
+	test("does not snap unrelated text to a wrong existing subdistrict, even at a low confidence floor", () => {
+		const parser = createAddressParser(resources, {
+			diagnostics: "full",
+			minFieldConfidence: 0.1,
+		});
 		const raw =
 			"นายทดสอบ ใจดี\n0812345678\nบ้านเลขที่ 1 ต.กระรอกน้อยเล่นซน เขตปทุมวัน กรุงเทพมหานคร 10330";
 

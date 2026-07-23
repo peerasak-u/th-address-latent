@@ -10,6 +10,14 @@ import type {
   ParsedSpan,
 } from "../types";
 
+/**
+ * Above this confidence, an administrative candidate with no gazetteer
+ * locationId (i.e. not verified against our own location database) cannot
+ * clear minFieldConfidence at its default of 0.5 — it still can if a caller
+ * deliberately lowers the threshold.
+ */
+const UNVERIFIED_ADMIN_CONFIDENCE_CAP = 0.3;
+
 const EMPTY_FIELDS: ParsedFields = {
   name: null,
   phone: null,
@@ -82,7 +90,12 @@ export function validateDecodeResult(
       abstentions.push({ field, reason: "invalid-format" });
       continue;
     }
-    const confidence = Math.max(0, Math.min(1, candidate.score));
+    const isUnverifiedAdmin =
+      ["SUBDISTRICT", "DISTRICT", "PROVINCE"].includes(candidate.label) &&
+      candidate.locationIds.length === 0;
+    const confidence = isUnverifiedAdmin
+      ? Math.min(UNVERIFIED_ADMIN_CONFIDENCE_CAP, Math.max(0, Math.min(1, candidate.score)))
+      : Math.max(0, Math.min(1, candidate.score));
     if (confidence < minFieldConfidence) {
       abstentions.push({ field, reason: "low-confidence" });
       continue;
